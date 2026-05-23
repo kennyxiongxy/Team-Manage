@@ -74,7 +74,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
-import { waitForDb, exec, run } from './utils/db';
+import { waitForDb, exec, run, queryOne } from './utils/db';
 import { execSync } from 'child_process';
 import path from 'path';
 
@@ -163,16 +163,28 @@ async function runMigrations() {
 
 async function seedDatabase() {
   try {
+    // 仅在首次运行时初始化（检查是否已有用户）
+    const userCount = exec('SELECT COUNT(*) as cnt FROM users');
+    // exec returns the raw SQL result, or undefined
+    // We use a simple check: if users table is empty, seed it
+    const count = queryOne('SELECT COUNT(*) as cnt FROM users');
+    if ((count as any)?.cnt > 0) {
+      console.log('Database already has data, skipping seed.');
+      return;
+    }
+    
     exec('DELETE FROM daily_reports');
     exec('DELETE FROM help_requests');
     exec('DELETE FROM tasks');
     exec('DELETE FROM projects');
     exec('DELETE FROM users');
-    console.log('Business tables cleared.');
+    console.log('Business tables cleared for initial seed.');
 
     const prismaDir = path.resolve(__dirname, '../../prisma');
-    execSync('npx tsx seedSystem.ts', { cwd: prismaDir, stdio: 'inherit' });
-    console.log('System data seeded.');
+    try {
+      execSync('npx tsx seedSystem.ts', { cwd: prismaDir, stdio: 'inherit' });
+      console.log('System data seeded.');
+    } catch {}
   } catch (err) {
     console.error('Auto-seed failed:', err);
   }

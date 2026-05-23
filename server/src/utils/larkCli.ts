@@ -86,7 +86,7 @@ export function getBaseTables(baseToken: string) {
   return (res.data?.items || []).map((t: any) => ({
     tableId: t.table_id,
     name: t.table_name,
-    recordCount: t.row_count || 0,
+    recordCount: 0,
     lastModified: t.last_modified_at || '',
   }));
 }

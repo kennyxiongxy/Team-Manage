@@ -1,6 +1,6 @@
 // ─── Core Types ───
 
-export type Priority = 'urgent' | 'high' | 'normal' | 'low' | 'P0' | 'P1' | 'P2' | 'P3' | 'medium';
+export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 
 export type TaskStatus =
   | 'not-started'
@@ -157,13 +157,8 @@ export const mockMorningBriefPoints: { id: number; text: string; type: string; c
 export const priorityConfig: Record<string, { label: string; color: string; bg: string }> = {
   urgent: { label: '紧急', color: '#EF4444', bg: 'bg-[rgba(239,68,68,0.15)]' },
   high: { label: '高', color: '#F97316', bg: 'bg-[rgba(249,115,22,0.15)]' },
-  normal: { label: '普通', color: '#3B82F6', bg: 'bg-[rgba(59,130,246,0.15)]' },
+  medium: { label: '中', color: '#3B82F6', bg: 'bg-[rgba(59,130,246,0.15)]' },
   low: { label: '低', color: '#22C55E', bg: 'bg-[rgba(34,197,94,0.15)]' },
-  medium: { label: '中', color: '#F97316', bg: 'bg-[rgba(249,115,22,0.15)]' },
-  P0: { label: 'P0', color: '#EF4444', bg: 'bg-[rgba(239,68,68,0.15)]' },
-  P1: { label: 'P1', color: '#F97316', bg: 'bg-[rgba(249,115,22,0.15)]' },
-  P2: { label: 'P2', color: '#3B82F6', bg: 'bg-[rgba(59,130,246,0.15)]' },
-  P3: { label: 'P3', color: '#22C55E', bg: 'bg-[rgba(34,197,94,0.15)]' },
 };
 
 export const statusConfig: Record<string, { label: string; color: string; icon: string; bg: string }> = {

@@ -4,6 +4,8 @@ import { queryOne, run } from '../utils/db';
 import { authMiddleware, requireManager } from '../middleware/auth';
 import { getFeishuUsers, searchFeishuBases, getBaseTables, getTableFields, getTableRecords, createDefaultTaskBase } from '../utils/larkCli';
 
+import { autoScanAndMap } from '../utils/dynamicFieldMapper';
+import { getMappedRecords } from '../utils/dynamicFieldMapper';
 const router = Router();
 
 /** 将数据库 snake_case 字段转换为前端 camelCase */
@@ -138,3 +140,144 @@ router.post('/create-default-tables', authMiddleware, requireManager, async (_re
 });
 
 export default router;
+
+// ─── 值标准化：将飞书表格中的中文值转换为系统英文值 ───
+
+function normalizePriority(val: string | null | undefined): string {
+  if (!val) return 'medium';
+  const v = String(val).replace(/[\[\]"]/g, '');
+  if (['高','最高','紧急','urgent'].includes(v)) return 'high';
+  if (['中','普通','medium'].includes(v)) return 'medium';
+  if (['低','low'].includes(v)) return 'low';
+  return 'medium';
+}
+
+function normalizeStatus(val: string | null | undefined): string {
+  if (!val) return 'not-started';
+  const v = String(val).replace(/[\[\]"]/g, '');
+  if (['进行中','in-progress'].includes(v)) return 'in-progress';
+  if (['已完成','completed'].includes(v)) return 'completed';
+  if (['已暂停','paused'].includes(v)) return 'paused';
+  return 'not-started';
+}
+
+function normalizeProjectStatus(val: string | null | undefined): string {
+  if (!val) return 'active';
+  const v = String(val).replace(/[\[\]"]/g, '');
+  if (['已完成','completed'].includes(v)) return 'completed';
+  // 所有其他状态（进行中、规划中、已暂停等）都映射为 active
+  return 'active';
+}
+
+function normalizeHelpStatus(val: string | null | undefined): string {
+  if (!val) return 'pending';
+  const v = String(val).replace(/[\[\]"]/g, '');
+  if (['已解决','resolved'].includes(v)) return 'resolved';
+  // 处理中、待处理等都映射为 pending
+  return 'pending';
+}
+
+// ─── 🔍 自动扫描与智能映射 ───
+
+
+/** 自动扫描飞书所有 Base，识别可用表格并自动映射字段 */
+router.get('/auto-scan', authMiddleware, requireManager, async (_req: Request, res: Response) => {
+  try {
+    const result = await autoScanAndMap();
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: '自动扫描失败: ' + error.message });
+  }
+});
+
+// ─── 🤖 自动同步 ───
+
+
+/** 根据自动扫描结果同步数据到系统 */
+router.post('/auto-sync', authMiddleware, requireManager, async (req: Request, res: Response) => {
+  try {
+    const { tables } = req.body as { tables: { tableType: string; baseToken: string; tableId: string; fieldMap: Record<string, string> }[] };
+
+    if (!tables || tables.length === 0) {
+      res.status(400).json({ success: false, message: '请提供要同步的表格配置' });
+      return;
+    }
+
+    const results: any[] = [];
+    let syncedTasks = 0, syncedProjects = 0, syncedReports = 0, syncedHelp = 0;
+
+    for (const table of tables) {
+      if (!table.tableId || !table.baseToken) continue;
+      
+      const records = getMappedRecords(table.baseToken, table.tableId, table.fieldMap);
+      
+      for (const record of records) {
+        switch (table.tableType) {
+          case 'tasks':
+            if (record.title) {
+              run(
+                `INSERT OR REPLACE INTO tasks (id, title, description, assignee_id, priority, status, progress, due_date, project_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [record._recordId, record.title, record.description || '', null, 
+                 normalizePriority(record.priority), normalizeStatus(record.status), parseInt(record.progress) || 0, record.dueDate || null, null]
+              );
+              syncedTasks++;
+            }
+            break;
+          case 'projects':
+            if (record.name) {
+              run(
+                `INSERT OR REPLACE INTO projects (id, name, health_score, progress, status)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [record._recordId, record.name, record.healthScore || 100, 
+                 record.progress || 0, normalizeProjectStatus(record.status)]
+              );
+              syncedProjects++;
+            }
+            break;
+          case 'reports':
+            if (record.date) {
+              run(
+                `INSERT OR REPLACE INTO daily_reports (id, employee_id, date, completed_tasks, tomorrow_plan, blockers, support_needed)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [record._recordId, null, record.date, record.completed || '', 
+                 record.plan || '', record.blockers || '', record.support || '']
+              );
+              syncedReports++;
+            }
+            break;
+          case 'help':
+            if (record.reason) {
+              run(
+                `INSERT OR REPLACE INTO help_requests (id, employee_id, task_id, reason, status)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [record._recordId, null, null, record.reason, normalizeHelpStatus(record.status)]
+              );
+              syncedHelp++;
+            }
+            break;
+        }
+      }
+
+      results.push({
+        tableName: table.tableType,
+        tableId: table.tableId,
+        syncedCount: records.length,
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        syncedTasks,
+        syncedProjects,
+        syncedReports,
+        syncedHelp,
+        totalSynced: syncedTasks + syncedProjects + syncedReports + syncedHelp,
+        details: results,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: '自动同步失败: ' + error.message });
+  }
+});

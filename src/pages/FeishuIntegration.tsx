@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import AutoScanPanel from '@/components/feishu/AutoScanPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -35,7 +36,7 @@ import {
 // ══════════════════════════════════════════════════════════════
 // Types
 // ══════════════════════════════════════════════════════════════
-type TabId = 'config' | 'users' | 'tables' | 'logs';
+type TabId = 'config' | 'users' | 'tables' | 'logs' | 'auto';
 
 interface TabDef {
   id: TabId;
@@ -1340,6 +1341,7 @@ export default function FeishuIntegration() {
     { id: 'users', label: '人员同步', icon: <Users size={16} /> },
     { id: 'tables', label: '表格管理', icon: <Table2 size={16} /> },
     { id: 'logs', label: '同步日志', icon: <Clock size={16} /> },
+    { id: 'auto', label: '智能匹配', icon: <Zap size={16} /> },
   ];
 
   return (
@@ -1380,6 +1382,7 @@ export default function FeishuIntegration() {
         {activeTab === 'users' && <UserSyncTab key="users" />}
         {activeTab === 'tables' && <TableManagementTab key="tables" />}
         {activeTab === 'logs' && <SyncLogsTab key="logs" />}
+        {activeTab === 'auto' && <AutoScanPanel key="auto" />}
       </AnimatePresence>
     </Layout>
   );

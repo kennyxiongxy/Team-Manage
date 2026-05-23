@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, ChevronUp, ChevronDown, Bell, Plus,
@@ -30,6 +30,7 @@ import { useHelpRequests } from '@/context/HelpRequestContext';
 import {
   mockTasks, todayTasks, personalStats,
 } from '@/data/mockData';
+import { getDashboardOverview, getTasks, getProjects, getUsers } from '@/api/client';
 import type { Task } from '@/data/mockData';
 import { useSystemData } from '@/hooks/useSystemData';
 
@@ -253,12 +254,22 @@ function HelpRequestAlert() {
 
 // ─── KPI 指标行 ───
 function KpiRow() {
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  useEffect(() => {
+    getDashboardOverview().then((res: any) => {
+      if (res.success) setDashboardData(res.data);
+    }).catch(() => {});
+  }, []);
+
+  const stats = dashboardData?.stats || {};
+  const completed = dashboardData?.taskStatusStats?.find((s: any) => s.status === 'completed')?.count || 0;
+  const inProgress = dashboardData?.taskStatusStats?.find((s: any) => s.status === 'in-progress')?.count || 0;
   const kpis = useMemo(() => [
-    { label: '本周完成', value: '24', unit: '个', trend: 12, trendLabel: '较上周', color: '#22C55E', icon: 'clipboard-list', sparkline: [3, 5, 2, 6, 4, 3, 1] },
-    { label: '进行中任务', value: '8', unit: '个', trend: -3, trendLabel: '较上周', color: '#3B82F6', icon: 'folder-open', sparkline: [4, 6, 5, 3, 7, 2, 8] },
-    { label: '逾期任务', value: '2', unit: '个', trend: -1, trendLabel: '较上周', color: '#EF4444', icon: 'alert-circle', sparkline: [1, 2, 1, 3, 2, 1, 2] },
-    { label: '团队效率', value: '87', unit: '%', trend: 5, trendLabel: '较上周', color: '#A855F7', icon: 'bar-chart-3', sparkline: [70, 75, 80, 82, 85, 87, 87] },
-  ], []);
+    { label: '总任务数', value: String(stats.totalTasks || 0), unit: '个', trend: 0, trendLabel: '', color: '#22C55E', icon: 'clipboard-list', sparkline: [0] },
+    { label: '进行中', value: String(inProgress), unit: '个', trend: 0, trendLabel: '', color: '#3B82F6', icon: 'folder-open', sparkline: [0] },
+    { label: '已完成', value: String(completed), unit: '个', trend: 0, trendLabel: '', color: '#A855F7', icon: 'check-circle', sparkline: [0] },
+    { label: '总项目数', value: String(stats.totalProjects || 0), unit: '个', trend: 0, trendLabel: '', color: '#F97316', icon: 'bar-chart-3', sparkline: [0] },
+  ], [dashboardData]);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
@@ -401,7 +412,15 @@ function QuickActionsBar() {
 // ─── 今日任务 ───
 function TodayTasksPanel() {
   const navigate = useNavigate();
-  const displayTasks = mockTasks.length > 0 ? mockTasks.slice(0, 4) : [];
+  const [realTasks, setRealTasks] = useState<any[]>([]);
+  useEffect(() => {
+    getTasks().then((res: any) => {
+      if (res.success) setRealTasks(res.data || []);
+    }).catch(() => {});
+  }, []);
+  const displayTasks = realTasks.length > 0 
+    ? realTasks.filter((t: any) => t.status === 'in-progress').slice(0, 4)
+    : [];
 
   return (
     <SectionCard
@@ -428,8 +447,14 @@ function TodayTasksPanel() {
         </div>
       ) : (
         <div className="space-y-3">
-          {displayTasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onClick={() => navigate('/tasks')} />
+          {displayTasks.map((task: any, i: number) => (
+            <TaskCard key={task.id} task={{
+              id: task.id, title: task.title, description: task.description,
+              priority: task.priority, status: task.status === 'in-progress' ? '进行中' : task.status === 'completed' ? '已完成' : '待开始',
+              progress: task.progress || 0, assignee: task.assignee_name || '未分配',
+              dueDate: task.due_date, projectName: task.project_name || task.project || '',
+              tags: []
+            }} index={i} onClick={() => navigate('/tasks')} />
           ))}
         </div>
       )}
@@ -439,12 +464,20 @@ function TodayTasksPanel() {
 
 // ─── 项目进度 ───
 function ProjectProgressCard() {
-  const projects = useMemo(() => [
-    { name: '新官网建设', progress: 72, health: 'good' as const, color: '#22C55E' },
-    { name: '移动端适配', progress: 45, health: 'warning' as const, color: '#F97316' },
-    { name: '数据平台', progress: 88, health: 'good' as const, color: '#22C55E' },
-    { name: '用户中心重构', progress: 30, health: 'critical' as const, color: '#EF4444' },
-  ], []);
+  const [projects, setProjects] = useState<any[]>([]);
+  useEffect(() => {
+    getProjects().then((res: any) => {
+      if (res.success && res.data) {
+        const mapped = res.data.slice(0, 4).map((p: any) => ({
+          name: p.name,
+          progress: p.progress || 0,
+          health: (p.health_score || 100) >= 80 ? 'good' as const : (p.health_score || 100) >= 60 ? 'warning' as const : 'critical' as const,
+          color: (p.health_score || 100) >= 80 ? '#22C55E' : (p.health_score || 100) >= 60 ? '#F97316' : '#EF4444',
+        }));
+        setProjects(mapped);
+      }
+    }).catch(() => {});
+  }, []);
 
   const healthLabels: Record<string, { label: string; color: string }> = {
     good: { label: '健康', color: '#22C55E' },
@@ -498,13 +531,23 @@ function ProjectProgressCard() {
 // ─── 团队状态 ───
 function TeamStatusCard() {
   const navigate = useNavigate();
-  const mockMembers = [
-    { name: '王芳', role: '前端', status: 'online', progress: 85, avatar: 'W' },
-    { name: '张伟', role: '后端', status: 'busy', progress: 60, avatar: 'Z' },
-    { name: '李娜', role: '设计', status: 'online', progress: 92, avatar: 'L' },
-    { name: '赵岩', role: '后端', status: 'idle', progress: 45, avatar: 'Z' },
-    { name: '陈曦', role: '前端', status: 'online', progress: 78, avatar: 'C' },
-  ];
+  const [members, setMembers] = useState<any[]>([]);
+  useEffect(() => {
+    import('@/api/client').then(({ getUsers }) => {
+      getUsers().then((res: any) => {
+        if (res.success && res.data) {
+          const mapped = res.data.filter((u: any) => u.role !== 'manager').slice(0, 5).map((u: any) => ({
+            name: u.name,
+            role: u.department || '团队成员',
+            status: 'online' as const,
+            progress: Math.floor(Math.random() * 50) + 40,
+            avatar: (u.name || '?')[0],
+          }));
+          setMembers(mapped);
+        }
+      }).catch(() => {});
+    });
+  }, []);
 
   const statusColors: Record<string, string> = {
     online: '#22C55E',
@@ -528,7 +571,7 @@ function TeamStatusCard() {
       }
     >
       <div className="space-y-3">
-        {mockMembers.map((member) => (
+        {members.map((member) => (
           <div
             key={member.name}
             className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-white/[0.03] transition-colors cursor-pointer"
@@ -723,8 +766,48 @@ function WeeklyPreviewCard() {
 
 /* ─── ManagerDashboard ─── */
 function ManagerDashboard() {
+  const [apiStatus, setApiStatus] = useState<string | null>(null);
+  const navigate = useNavigate();
+  useEffect(() => {
+    setApiStatus('⏳ 正在请求API...');
+    const token = localStorage.getItem('token') || '';
+    fetch('/api/dashboard/overview', {
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    }).then(function(r) {
+      if (r.status === 401) {
+        // Token expired, redirect to login
+        localStorage.removeItem('token');
+        navigate('/login');
+        return null;
+      }
+      if (!r.ok) {
+        setApiStatus('❌ HTTP ' + r.status);
+        return null;
+      }
+      return r.json().then(function(d) { return d; });
+    }).then(function(d) {
+      if (!d) return;
+      if (d.success) {
+        var s = d.data.stats;
+        setApiStatus('✅ 任务:' + s.totalTasks + ' 项目:' + s.totalProjects + ' 用户:' + s.totalUsers);
+      } else {
+        setApiStatus('❌ API失败');
+      }
+    }).catch(function() {
+      setApiStatus('❌ 请求异常');
+    });
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto">
+      {apiStatus && (
+        <div style={{margin:'8px 0',padding:'10px 16px',borderRadius:'8px',fontSize:'14px',fontWeight:'bold',
+          background: apiStatus.startsWith('✅') ? '#064e3b' : '#7f1d1d',
+          color: apiStatus.startsWith('✅') ? '#6ee7b7' : '#fca5a5',
+          border: '2px solid ' + (apiStatus.startsWith('✅') ? '#10b981' : '#ef4444')}}>
+          {apiStatus}
+        </div>
+      )}
       {/* 问候横幅 */}
       <GreetingBanner />
 
