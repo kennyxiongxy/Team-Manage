@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.VarChar(32)
+  name          String   @db.VarChar(50)
+  email         String?  @unique @db.VarChar(100)
+  password      String?  @db.VarChar(255)
+  role          Role     @default(employee)
+  department    String?  @db.VarChar(50)
+  avatarUrl     String?  @map("avatar_url")
+  feishuOpenId  String?  @map("feishu_open_id") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tasks         Task[]
+  createdTasks  Task[]   @relation("CreatedBy")
+  dailyReports  DailyReport[]
+  helpRequests  HelpRequest[]
+
+  @@map("users")
+}
+
+model Task {
+  id            String     @id @default(uuid()) @db.VarChar(32)
+  title         String     @db.VarChar(200)
+  description   String?    @db.Text
+  projectId     String?    @map("project_id") @db.VarChar(32)
+  assigneeId    String?    @map("assignee_id") @db.VarChar(32)
+  priority      Priority   @default(medium)
+  status        TaskStatus @default(not_started)
+  progress      Int        @default(0)
+  dueDate       DateTime?  @map("due_date") @db.Date
+  startDate     DateTime?  @map("start_date") @db.Date
+  createdBy     String?    @map("created_by") @db.VarChar(32)
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  project       Project?   @relation(fields: [projectId], references: [id])
+  assignee      User?      @relation(fields: [assigneeId], references: [id])
+  creator       User?      @relation("CreatedBy", fields: [createdBy], references: [id])
+
+  @@map("tasks")
+}
+
+model Project {
+  id            String   @id @default(uuid()) @db.VarChar(32)
+  name          String   @db.VarChar(100)
+  healthScore   Int      @default(100) @map("health_score")
+  progress      Int      @default(0)
+  status        ProjectStatus @default(active)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tasks         Task[]
+
+  @@map("projects")
+}
+
+model DailyReport {
+  id              String   @id @default(uuid()) @db.VarChar(32)
+  employeeId      String   @map("employee_id") @db.VarChar(32)
+  date            DateTime @db.Date
+  completedTasks  Json?    @map("completed_tasks")
+  tomorrowPlan    Json?    @map("tomorrow_plan")
+  blockers        String?  @db.Text
+  supportNeeded   String?  @map("support_needed") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  employee        User     @relation(fields: [employeeId], references: [id])
+
+  @@map("daily_reports")
+}
+
+model HelpRequest {
+  id          String           @id @default(uuid()) @db.VarChar(32)
+  employeeId  String           @map("employee_id") @db.VarChar(32)
+  taskId      String?          @map("task_id") @db.VarChar(32)
+  reason      String?          @db.Text
+  status      HelpRequestStatus @default(pending)
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  employee    User             @relation(fields: [employeeId], references: [id])
+
+  @@map("help_requests")
+}
+
+model FeishuConfig {
+  id          Int      @id @default(autoincrement())
+  appId       String?  @map("app_id") @db.VarChar(100)
+  appSecret   String?  @map("app_secret") @db.VarChar(200)
+  webhookUrl  String?  @map("webhook_url") @db.Text
+  connected   Boolean  @default(false)
+  connectedAt DateTime? @map("connected_at")
+
+  @@map("feishu_configs")
+}
+
+enum Role {
+  manager
+  employee
+}
+
+enum Priority {
+  urgent
+  high
+  medium
+  low
+}
+
+enum TaskStatus {
+  not_started      @map("not-started")
+  in_progress      @map("in-progress")
+  pending_review   @map("pending-review")
+  completed
+  overdue
+}
+
+enum ProjectStatus {
+  active
+  completed
+  at_risk          @map("at-risk")
+}
+
+enum HelpRequestStatus {
+  pending
+  resolved
+}

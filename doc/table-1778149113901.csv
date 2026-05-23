@@ -1,0 +1,11 @@
+﻿优先级,待办项,说明
+P0,后端 API 服务,FastAPI/Node.js 搭建，提供 RESTful API
+P0,数据库接入,PostgreSQL 替换 Mock 数据
+P0,用户认证,JWT Token + 登录/注册
+P1,飞书 API 对接,真实调用飞书开放平台 API
+P1,AI 服务接入,接入 DeepSeek/MiniMax 等大模型
+P1,WebSocket 实时通知,任务状态变更实时推送
+P2,定时任务,晨报/日报/周报自动生成调度
+P2,文件上传,头像/附件上传（OSS/S3）
+P2,数据导出,PDF/Excel 报告导出
+P3,性能优化,代码分割 + 懒加载 + 缓存

@@ -1,0 +1,7 @@
+﻿文件,行数,功能
+`src/pages/Home.tsx`,~750,管理者仪表盘/员工工作台（6层分区）
+`src/pages/TaskCenter.tsx`,~400,任务中心（看板/甘特图/列表三视图）
+`src/pages/AiAssistant.tsx`,~350,AI 智能助手（语义分析引擎）
+`src/pages/FeishuIntegration.tsx`,~600,飞书集成（连接/人员/表格/日志）
+`src/data/mockData.ts`,~800,核心数据模型（任务/成员/项目）
+`src/context/*.tsx`,~200,4个全局状态上下文
