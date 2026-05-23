@@ -10,7 +10,7 @@ import {
   Link2,
   Paperclip,
 } from 'lucide-react';
-import { mockProjects, mockTeamMembers, priorityConfig } from '@/data/mockData';
+import { priorityConfig } from '@/data/mockData';
 import type { Priority, TaskStatus } from '@/data/mockData';
 
 interface CreateTaskModalProps {
@@ -34,13 +34,13 @@ export default function CreateTaskModal({
   open,
   onClose,
   onCreate,
-  defaultStatus = '未开始',
+  defaultStatus = 'not-started',
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [projectId, setProjectId] = useState(mockProjects[0]?.id ?? '');
-  const [assigneeId, setAssigneeId] = useState(mockTeamMembers[0]?.id ?? '');
-  const [priority, setPriority] = useState<Priority>('P2');
+  const [projectId, setProjectId] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
+  const [priority, setPriority] = useState<Priority>('medium');
   const [dueDate, setDueDate] = useState('');
 
   const handleSubmit = () => {
@@ -56,7 +56,7 @@ export default function CreateTaskModal({
     });
     setTitle('');
     setDescription('');
-    setPriority('P2');
+    setPriority('medium');
     setDueDate('');
     onClose();
   };

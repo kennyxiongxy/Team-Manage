@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Paperclip, Mic, Sparkles, User, CheckCircle2 } from 'lucide-react';
 import type { ChatMessage, AiInsightCardData } from '@/data/mockData';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { cn } from '@/lib/utils';
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -10,6 +11,7 @@ const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
+  onActionClick?: (action: string) => void;
 }
 
 function TypingIndicator() {
@@ -76,7 +78,7 @@ function InsightCard({ card }: { card: AiInsightCardData }) {
   );
 }
 
-export default function ChatInterface({ messages, onSendMessage }: ChatInterfaceProps) {
+export default function ChatInterface({ messages, onSendMessage, onActionClick }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -103,16 +105,15 @@ export default function ChatInterface({ messages, onSendMessage }: ChatInterface
   };
 
   return (
-    <div className="flex h-full min-h-[500px] flex-col rounded-2xl bg-card border border-border">
+    <div className="flex flex-col max-h-[520px] lg:max-h-[600px] rounded-2xl bg-card border border-border">
       {/* Chat messages area */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 space-y-4"
-        style={{ maxHeight: '60vh' }}
       >
         <AnimatePresence initial={false}>
           {messages.map((msg) => (
-            <ChatMessageBubble key={msg.id} message={msg} />
+            <ChatMessageBubble key={msg.id} message={msg} onSendMessage={onSendMessage} onActionClick={onActionClick} />
           ))}
         </AnimatePresence>
         {isTyping && (
@@ -170,7 +171,7 @@ export default function ChatInterface({ messages, onSendMessage }: ChatInterface
   );
 }
 
-function ChatMessageBubble({ message }: { message: ChatMessage }) {
+function ChatMessageBubble({ message, onSendMessage, onActionClick }: { message: ChatMessage; onSendMessage: (content: string) => void; onActionClick?: (action: string) => void }) {
   if (message.role === 'system') {
     return (
       <motion.div
@@ -181,11 +182,11 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
       >
         <div className="flex items-center justify-center gap-2">
           <Sparkles className="h-3.5 w-3.5 text-[#A855F7]" />
-          <span className="text-sm text-foreground">{message.content}</span>
+          <MarkdownRenderer content={message.content} />
         </div>
         {message.actions && message.actions.length > 0 && (
           <button
-            onClick={() => toast.success('AI 报告生成中...')}
+            onClick={() => onActionClick?.('view-weekly')}
             className="mt-2 text-xs font-medium text-[#A855F7] hover:underline"
           >
             查看报告
@@ -206,7 +207,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
         <div className="flex items-start gap-3 max-w-[70%]">
           <div className="rounded-xl rounded-tr-sm bg-muted px-4 py-3">
             <p className="whitespace-pre-wrap text-sm text-foreground">{message.content}</p>
-            <span className="mt-1 block text-right text-[10px text-muted-foreground">{message.timestamp}</span>
+            <span className="mt-1 block text-right text-[10px] text-muted-foreground">{message.timestamp}</span>
           </div>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
             <User className="h-4 w-4 text-muted-foreground" />
@@ -233,9 +234,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
           <span className="text-[10px] text-muted-foreground">{message.timestamp}</span>
         </div>
         <div className="rounded-xl rounded-tl-sm bg-transparent">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {message.content}
-          </p>
+          <MarkdownRenderer content={message.content} />
         </div>
         {message.cards && message.cards.length > 0 && (
           <div className="space-y-2 mt-2">
@@ -251,7 +250,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
                 key={action.action}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => toast.success(`正在${action.label}...`)}
+                onClick={() => onSendMessage?.(`帮我${action.label}`)}
                 className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-[#A855F7] to-[#3B82F6] px-3 py-1.5 text-xs font-medium text-primary-foreground transition-shadow hover:shadow-[0_0_12px_rgba(168,85,247,0.25)]"
               >
                 <CheckCircle2 className="h-3 w-3" />

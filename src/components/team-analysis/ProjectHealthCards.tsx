@@ -198,7 +198,7 @@ function ProjectCard({ project, index }: { project: ProjectHealth; index: number
             </div>
           </div>
           <button
-            onClick={() => toast.info('功能开发中，敬请期待', { duration: 2000 })}
+            onClick={() => window.location.hash = '#/'}
             className="text-accent text-xs flex items-center gap-1 hover:underline mt-2"
           >
             查看详情 <ChevronRight className="w-3 h-3" />

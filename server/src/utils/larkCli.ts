@@ -347,3 +347,107 @@ export function createDefaultTaskBase(): CreatedBaseInfo {
     existing: false,
   };
 }
+
+// ─── 同步用户信息到飞书通讯录 ───
+
+interface SyncUserResult {
+  success: boolean;
+  message: string;
+}
+
+/**
+ * 将系统用户信息同步到飞书通讯录
+ * 使用飞书 Open API: PATCH /open-apis/contact/v3/users/:user_id
+ */
+export async function syncUserToFeishu(params: {
+  userId: string;
+  name?: string;
+  department?: string;
+  email?: string;
+  phone?: string;
+}): Promise<SyncUserResult> {
+  const { userId, name, department, email, phone } = params;
+
+  // 1. 获取飞书配置
+  const { queryOne } = await import('./db');
+  const config = queryOne<{ app_id: string; app_secret: string; connected: number }>(
+    'SELECT app_id, app_secret, connected FROM feishu_configs LIMIT 1'
+  );
+
+  if (!config || !config.connected || !config.app_id || !config.app_secret) {
+    return { success: false, message: '飞书未连接或配置不完整，跳过同步' };
+  }
+
+  // 2. 获取用户飞书 open_id
+  const user = queryOne<{ feishu_open_id: string }>(
+    'SELECT feishu_open_id FROM users WHERE id = ?',
+    [userId]
+  );
+
+  if (!user?.feishu_open_id) {
+    return { success: false, message: '用户未绑定飞书账号，跳过同步' };
+  }
+
+  // 3. 获取 tenant_access_token
+  try {
+    const tokenRes = await fetch('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        app_id: config.app_id,
+        app_secret: config.app_secret,
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      return { success: false, message: `获取飞书Token失败: ${tokenRes.status}` };
+    }
+
+    const tokenData = await tokenRes.json() as any;
+    const accessToken = tokenData?.tenant_access_token;
+    if (!accessToken) {
+      return { success: false, message: '飞书Token响应异常' };
+    }
+
+    // 4. 构建更新字段
+    const body: Record<string, any> = {};
+    if (name) body.name = name;
+    if (department) {
+      // Feishu department_ids is an array
+      body.department_ids = [department];
+    }
+    if (email) body.email = email;
+    if (phone) body.mobile = phone;
+
+    if (Object.keys(body).length === 0) {
+      return { success: true, message: '无需同步的字段' };
+    }
+
+    // 5. 调用飞书更新用户 API
+    const updateRes = await fetch(
+      `https://open.feishu.cn/open-apis/contact/v3/users/${user.feishu_open_id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!updateRes.ok) {
+      const errText = await updateRes.text();
+      return { success: false, message: `飞书更新失败: ${updateRes.status} ${errText.slice(0, 100)}` };
+    }
+
+    const updateData = await updateRes.json() as any;
+    if (updateData.code !== 0) {
+      return { success: false, message: `飞书更新异常: ${updateData.msg || '未知错误'}` };
+    }
+
+    return { success: true, message: '已同步到飞书通讯录' };
+  } catch (error: any) {
+    return { success: false, message: `飞书同步异常: ${error.message?.slice(0, 100)}` };
+  }
+}

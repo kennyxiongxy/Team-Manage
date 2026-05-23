@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { getUsers } from '@/api/client';
+import { getUsers, getTasks } from '@/api/client';
 import type { TeamMember } from '@/data/mockData';
 
 interface TeamStoreContextType {
@@ -26,7 +26,7 @@ function mapBackendUser(u: any): TeamMember {
     completionRate: 0,
     onTimeRate: 100,
     qualityScore: 0,
-    avgTaskDuration: '0天',
+    avgTaskDuration: 0,
     collabCount: 0,
     grade: 'B',
     color: '#3B82F6',
@@ -42,9 +42,35 @@ export function TeamStoreProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getUsers()
-      .then((res) => {
-        if (res.success) setMembers(res.data.map(mapBackendUser));
+    Promise.all([getUsers(), getTasks()])
+      .then(([usersRes, tasksRes]) => {
+        if (usersRes.success) {
+          const users = usersRes.data;
+          const tasks = tasksRes.success ? tasksRes.data : [];
+          
+          // 计算每个用户的任务统计
+          const taskCountByUser: Record<string, { total: number; completed: number; inProgress: number }> = {};
+          for (const t of tasks) {
+            if (!t.assignee_id) continue;
+            if (!taskCountByUser[t.assignee_id]) {
+              taskCountByUser[t.assignee_id] = { total: 0, completed: 0, inProgress: 0 };
+            }
+            taskCountByUser[t.assignee_id].total++;
+            if (t.status === 'completed') taskCountByUser[t.assignee_id].completed++;
+            if (t.status === 'in-progress') taskCountByUser[t.assignee_id].inProgress++;
+          }
+          
+          setMembers(users.map((u: any) => {
+            const stats = taskCountByUser[u.id] || { total: 0, completed: 0, inProgress: 0 };
+            return {
+              ...mapBackendUser(u),
+              workload: stats.total,
+              workloadPercent: users.length > 1 ? Math.round((stats.total / Math.max(1, tasks.length / users.length)) * 100) : 0,
+              tasksCompleted: stats.completed,
+              tasksInProgress: stats.inProgress,
+            };
+          }));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -75,7 +101,7 @@ export function TeamStoreProvider({ children }: { children: ReactNode }) {
           completionRate: 0,
           onTimeRate: 100,
           qualityScore: 0,
-          avgTaskDuration: '0天',
+          avgTaskDuration: 0,
           tasksCompleted: 0,
           collabCount: 0,
           color: '#3B82F6',

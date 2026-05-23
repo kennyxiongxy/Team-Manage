@@ -1,21 +1,45 @@
-import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import ChatInterface from '@/components/ai-assistant/ChatInterface';
 import AiDecisionLog from '@/components/ai-assistant/AiDecisionLog';
 import AiCapabilitySwitches from '@/components/ai-assistant/AiCapabilitySwitches';
 import QuickPrompts from '@/components/ai-assistant/QuickPrompts';
 import PageHeader from '@/components/PageHeader';
+import { X, ChevronRight, Bot, Brain, RefreshCw, Trash2 } from 'lucide-react';
+import { api } from '@/api/client';
 import type { ChatMessage, RiskProject, EfficiencyDimension, ManagementSuggestion } from '@/data/mockData';
+import type { TeamContext } from '@/types/memory';
 import { useSystemData } from '@/hooks/useSystemData';
 import { cn } from '@/lib/utils';
-import { decisionLogs, aiCapabilities, arTeamMembers } from '@/data/mockData';
+import Layout from '@/components/Layout';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
+import {
+  decisionLogs,
+  aiCapabilities,
+  arTeamMembers,
+  riskProjects as _mockRiskProjects,
+  efficiencyRadarData as _mockEfficiencyRadarData,
+  managementSuggestions as _mockManagementSuggestions,
+} from '@/data/mockData';
 
 // Module-level data refs (populated by DataLoader)
-let initialChatMessages: ChatMessage[] = [];
-let riskProjects: RiskProject[] = [];
-let efficiencyRadarData: EfficiencyDimension[] = [];
-let managementSuggestions: ManagementSuggestion[] = [];
+let initialChatMessages: ChatMessage[] = [
+  {
+    id: 'welcome',
+    role: 'ai',
+    content: '👋 你好，我是陈总。在这个团队里做了十几年管理，从一线销售一路带到了 VP。\n\n团队的事就是我的事。你可以问我：\n• 项目进度怎么样？有什么风险？\n• 谁最近比较忙？需要调配人手吗？\n• 给我一个本周的总结\n• 有什么管理上的建议？\n\n数据我随时在看，你直接问。',
+    timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    actions: [
+      { label: '查看任务概览', action: 'view-tasks' },
+      { label: '分析团队效率', action: 'view-efficiency' },
+    ],
+  },
+];
+let riskProjects: RiskProject[] = _mockRiskProjects;
+let efficiencyRadarData: EfficiencyDimension[] = _mockEfficiencyRadarData;
+let managementSuggestions: ManagementSuggestion[] = _mockManagementSuggestions;
 let aiEffectiveness: any = { adoptionRate: 0, overdueReduction: 0, decisionTimeReduction: 0, weeklyAdoption: [], completionRateImprovement: [] };
 import {
   ResponsiveContainer,
@@ -36,6 +60,128 @@ import {
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
+
+// ─── Team Memory Panel ───
+function TeamMemoryPanel() {
+  const [facts, setFacts] = useState<TeamContext[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+
+  const fetchFacts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ success: boolean; data: TeamContext[] }>('/api/ai/context');
+      if (res.success) setFacts(res.data);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchFacts();
+  }, [fetchFacts]);
+
+  const dismissFact = async (id: number) => {
+    try {
+      await api.delete(`/api/ai/context/${id}`);
+      setFacts(prev => prev.filter(f => f.id !== id));
+      toast.success('已忽略');
+    } catch {
+      toast.error('操作失败');
+    }
+  };
+
+  const categoryColors: Record<string, string> = {
+    personnel: 'border-l-[#A855F7] bg-[rgba(168,85,247,0.06)]',
+    project: 'border-l-[#3B82F6] bg-[rgba(59,130,246,0.06)]',
+    constraint: 'border-l-[#F97316] bg-[rgba(249,115,22,0.06)]',
+    preference: 'border-l-[#22C55E] bg-[rgba(34,197,94,0.06)]',
+    decision: 'border-l-accent bg-accent/5',
+  };
+
+  const categoryLabels: Record<string, string> = {
+    personnel: '人事',
+    project: '项目',
+    constraint: '约束',
+    preference: '偏好',
+    decision: '决策',
+  };
+
+  if (facts.length === 0 && !loading) return null;
+
+  return (
+    <div className="rounded-2xl bg-muted border border-border p-4">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-[#A855F7]" />
+          <span className="text-sm font-semibold text-foreground">AI 记忆</span>
+          <span className="rounded-full bg-[rgba(168,85,247,0.15)] px-1.5 py-0.5 text-[10px] font-mono text-[#A855F7]">
+            {facts.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => { e.stopPropagation(); fetchFacts(); }}
+            className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+            title="刷新"
+          >
+            <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
+          </button>
+          <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
+        </div>
+      </button>
+
+      {expanded && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="mt-3 space-y-2 overflow-hidden"
+        >
+          {loading && facts.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-2">加载中...</p>
+          ) : (
+            facts.map(fact => (
+              <div
+                key={fact.id}
+                className={cn(
+                  'rounded-lg border-l-2 px-3 py-2 text-xs',
+                  categoryColors[fact.category] || 'border-l-muted bg-muted/30'
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      {categoryLabels[fact.category] || fact.category}
+                    </span>
+                    <p className="mt-0.5 text-foreground leading-relaxed">{fact.content}</p>
+                    {fact.confidence < 0.6 && (
+                      <span className="mt-1 inline-block text-[10px] text-[#F97316]">⚠️ 待确认</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => dismissFact(fact.id)}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                    title="忽略"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+          {facts.length === 0 && !loading && (
+            <p className="text-xs text-muted-foreground py-2">
+              暂无记忆。在和 AI 对话时提到关键信息（如人员变动、重要决策），AI 会自动记录。
+            </p>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ─── AI Report Cards ───
 function DataLoader() {
   const { data: chat } = useSystemData('initialChatMessages');
@@ -43,10 +189,24 @@ function DataLoader() {
   const { data: radar } = useSystemData('efficiencyRadarData');
   const { data: suggestions } = useSystemData('managementSuggestions');
   const { data: effectiveness } = useSystemData('aiEffectiveness');
-  if (chat) initialChatMessages = chat;
-  if (risk) riskProjects = risk;
-  if (radar) efficiencyRadarData = radar;
-  if (suggestions) managementSuggestions = suggestions;
+
+  // 优先使用 API 数据，为空时回退到 mockData
+  // 修复：API 返回的 \n 是字面字符串，需转为真正的换行符
+  if (chat && (Array.isArray(chat) ? chat.length > 0 : true)) {
+    initialChatMessages = chat.map((msg: any) => ({
+      ...msg,
+      content: typeof msg.content === 'string' ? msg.content.replace(/\\n/g, '\n') : msg.content,
+    }));
+  }
+  if (risk && (Array.isArray(risk) ? risk.length > 0 : false)) {
+    riskProjects = risk;
+  }
+  if (radar && (Array.isArray(radar) ? radar.length > 0 : false)) {
+    efficiencyRadarData = radar;
+  }
+  if (suggestions && (Array.isArray(suggestions) ? suggestions.length > 0 : false)) {
+    managementSuggestions = suggestions;
+  }
   if (effectiveness) aiEffectiveness = effectiveness;
   return null;
 }
@@ -88,7 +248,10 @@ function RiskReportCard() {
           ))
         )}
       </div>
-      <button className="mt-4 text-sm text-accent hover:underline flex items-center gap-1">
+      <button
+        onClick={() => window.location.hash = '#/'}
+        className="mt-4 text-sm text-accent hover:underline flex items-center gap-1"
+      >
         查看完整风险评估 →
       </button>
     </motion.div>
@@ -137,11 +300,23 @@ function EfficiencyReportCard() {
           <>
             <div className="flex items-center gap-2 rounded-lg bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.2)] px-3 py-2">
               <span className="text-xs text-[#22C55E] font-medium">⭐ 本周之星</span>
-              <span className="text-xs text-foreground">数据加载中...</span>
+              <span className="text-xs text-foreground">
+                {aiEffectiveness.weeklyAdoption?.length > 0
+                  ? aiEffectiveness.weeklyAdoption[aiEffectiveness.weeklyAdoption.length - 1]?.name || '暂无'
+                  : arTeamMembers.length > 0
+                    ? arTeamMembers.sort((a: any, b: any) => (b.tasksCompleted || 0) - (a.tasksCompleted || 0))[0]?.name || '暂无'
+                    : '暂无数据'}
+              </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-[rgba(249,115,22,0.1)] border border-[rgba(249,115,22,0.2)] px-3 py-2">
               <span className="text-xs text-[#F97316] font-medium">⚠️ 需关注</span>
-              <span className="text-xs text-foreground">数据加载中...</span>
+              <span className="text-xs text-foreground">
+                {aiEffectiveness.overdueReduction > 0
+                  ? `${aiEffectiveness.overdueReduction} 项逾期需处理`
+                  : riskProjects.length > 0
+                    ? `${riskProjects.length} 个项目存在风险`
+                    : '暂无异常'}
+              </span>
             </div>
           </>
         )}
@@ -176,6 +351,7 @@ function SuggestionsReportCard() {
           WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
           WebkitMaskComposite: 'xor',
           maskComposite: 'exclude',
+          pointerEvents: 'none',
         }}
       />
 
@@ -218,11 +394,104 @@ function SuggestionsReportCard() {
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#A855F7] to-[#3B82F6] py-2.5 text-sm font-medium text-primary-foreground transition-shadow hover:shadow-[0_0_20px_rgba(168,85,247,0.3)]"
+        onClick={async () => {
+          const suggestions = managementSuggestions;
+          if (!suggestions || suggestions.length === 0) {
+            toast.info('暂无建议可采纳');
+            return;
+          }
+          const highPriority = suggestions.filter((s: ManagementSuggestion) => s.priority === 'high');
+          if (highPriority.length === 0) {
+            toast.info('没有高优先级建议需要采纳');
+            return;
+          }
+          toast.info(`正在创建 ${highPriority.length} 条任务...`);
+          try {
+            const results = await Promise.all(
+              highPriority.map((s: ManagementSuggestion) =>
+                api.post('/api/tasks', {
+                  title: s.text.slice(0, 40),
+                  description: s.text,
+                  priority: 'high',
+                  status: 'not-started',
+                })
+              )
+            );
+            const successCount = results.filter((r: any) => r.success).length;
+            toast.success(`已创建 ${successCount} 条高优先级任务`);
+            if (successCount > 0) {
+              // Trigger dashboard refresh
+              window.dispatchEvent(new CustomEvent('task-created'));
+            }
+          } catch (e) {
+            toast.error('创建任务失败，请重试');
+          }
+        }}
+        className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#A855F7] to-[#3B82F6] py-2.5 text-sm font-medium text-primary-foreground transition-shadow hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] relative z-10"
       >
         一键采纳全部建议
       </motion.button>
     </motion.div>
+  );
+}
+
+// ─── AI Settings Modal Button ───
+function AiSettingsButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        onClick={() => setOpen(true)}
+        className="w-full rounded-2xl bg-muted border border-border p-4 text-left hover:border-accent/30 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(168,85,247,0.15)]">
+              <Bot className="h-5 w-5 text-[#A855F7]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">AI 自动化设置</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {aiCapabilities.filter((c: any) => c.enabled).length}/{aiCapabilities.length} 项已启用
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-5 border-b border-border">
+                <h2 className="text-lg font-semibold text-foreground">AI 自动化设置</h2>
+                <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="p-5">
+                <AiCapabilitySwitches />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -300,79 +569,191 @@ function AiStatsPanel() {
 }
 
 // ─── AI 智能回复引擎 ───
-function generateAiResponse(userContent: string): { content: string; actions: { label: string; action: string }[] } {
-  const text = userContent.toLowerCase();
+async function generateAiResponse(
+  userContent: string,
+  sessionId: string,
+): Promise<{ content: string; actions: { label: string; action: string }[] }> {
+  // 收集系统上下文数据
+  let taskCount = 0, inProgressCount = 0, projectCount = 0, userCount = 0, overdueCount = 0;
+  let recentTasks: string[] = [];
+  let recentProjects: string[] = [];
 
-  // 1. 项目进度/风险查询
-  if (text.includes('进度') || text.includes('风险') || text.includes('滞后') || text.includes('逾期') || text.includes('延期')) {
-    return {
-      content: `📊 项目风险分析\n\n暂无项目数据。\n\n请先连接飞书多维表格，同步项目信息后再进行风险分析。`,
-      actions: [
-        { label: '查看项目看板', action: 'view-projects' },
-        { label: '生成追赶计划', action: 'generate-plan' },
-      ],
-    };
-  }
+  try {
+    const [tasksRes, projectsRes, usersRes, statsRes] = await Promise.all([
+      api.get<{ success: boolean; data: any[] }>('/api/tasks'),
+      api.get<{ success: boolean; data: any[] }>('/api/projects'),
+      api.get<{ success: boolean; data: any[] }>('/api/users'),
+      api.get<{ success: boolean; data: { total: number; overdue: number } }>('/api/tasks/stats/overview'),
+    ]);
+    if (tasksRes.success) {
+      const tasks = tasksRes.data;
+      taskCount = tasks.length;
+      inProgressCount = tasks.filter((t: any) => t.status === 'in-progress').length;
+      recentTasks = tasks.filter((t: any) => t.status === 'in-progress').slice(0, 10).map(
+        (t: any) => `${t.title}（进度 ${t.progress}%${t.assignee_name ? ', 负责人: ' + t.assignee_name : ''}）`
+      );
+    }
+    if (projectsRes.success) {
+      projectCount = projectsRes.data.length;
+      recentProjects = projectsRes.data.slice(0, 7).map(
+        (p: any) => `${p.name}（负责人: ${p.owner_name || '未分配'}, 健康度: ${p.health_score ?? 'N/A'}, 进度: ${p.progress ?? 0}%）`
+      );
+    }
+    if (usersRes.success) userCount = usersRes.data.length;
+    if (statsRes.success) overdueCount = statsRes.data.overdue;
+  } catch { /* 保持默认值 */ }
 
-  // 2. 人员/负载查询
-  if (text.includes('谁') || text.includes('人员') || text.includes('负荷') || text.includes('负载') || text.includes('忙') || text.includes('闲') || text.includes('效率')) {
-    return {
-      content: `👥 团队人员效率分析\n\n暂无人员数据。\n\n请先连接飞书多维表格，同步团队人员信息后再进行效率分析。`,
-      actions: [
-        { label: '查看效率矩阵', action: 'view-efficiency' },
-        { label: '执行人员调配', action: 'adjust-resource' },
-      ],
-    };
-  }
+  const context = { taskCount, inProgressCount, overdueCount, projectCount, userCount, recentTasks, recentProjects };
 
-  // 3. 任务相关查询
-  if (text.includes('任务') || text.includes('完成') || text.includes('今日') || text.includes('今天') || text.includes('todo') || text.includes('待办')) {
-    return {
-      content: `📋 今日任务概览\n\n暂无任务数据。\n\n请先连接飞书多维表格，同步任务信息后再查看任务概览。`,
-      actions: [
-        { label: '查看任务中心', action: 'view-tasks' },
-        { label: '一键提醒逾期', action: 'remind-overdue' },
-      ],
-    };
-  }
+  // 调用后端 AI 接口
+  try {
+    const aiRes = await api.post<{ success: boolean; data: { reply: string; model?: string; sessionId?: string; memoryFacts?: number } }>(
+      '/api/ai/chat',
+      { message: userContent, context, sessionId }
+    );
+    if (aiRes.success) {
+      return {
+        content: aiRes.data.reply,
+        actions: [
+          { label: '查看任务中心', action: 'view-tasks' },
+          { label: '查看团队概况', action: 'view-overview' },
+        ],
+      };
+    }
+  } catch { /* AI 接口失败时走后端规则引擎回退 */ }
 
-  // 4. 周报/日报
-  if (text.includes('周报') || text.includes('日报') || text.includes('报告') || text.includes('总结')) {
-    return {
-      content: `📊 本周总结报告\n\n暂无周报数据。\n\n请先连接飞书多维表格，同步任务和日报信息后再生成周报。`,
-      actions: [
-        { label: '查看完整周报', action: 'view-weekly' },
-        { label: '导出 PDF', action: 'export-pdf' },
-      ],
-    };
-  }
-
-  // 5. 建议/优化
-  if (text.includes('建议') || text.includes('优化') || text.includes('怎么做') || text.includes('怎么办') || text.includes('如何')) {
-    return {
-      content: `💡 AI 管理建议\n\n暂无团队数据，无法生成针对性建议。\n\n请先连接飞书多维表格，同步任务、项目和人员信息后再获取 AI 管理建议。`,
-      actions: [
-        { label: '生成执行方案', action: 'generate-plan' },
-        { label: '添加到日历', action: 'add-calendar' },
-      ],
-    };
-  }
-
-  // 默认回复
+  // 最终回退
   return {
-    content: `👋 您好！我是您的 AI 管理助手「统御」。\n\n我可以帮您分析以下内容：\n• 📊 项目进度与风险\n• 👥 人员效率与负荷\n• 📋 任务分配与跟踪\n• 📈 周报日报生成\n• 💡 管理建议与优化\n\n您可以这样提问：\n「谁现在最闲？」\n「项目进度怎么样？」\n「给我本周的总结」\n「有什么建议？」\n\n请告诉我您想了解什么，我会为您深入分析团队数据。`,
+    content: `👋 您好！我是统御 AI 助手。\\n\\n当前系统：${taskCount} 项任务 | ${projectCount} 个项目 | ${userCount} 人团队 | ${overdueCount} 项逾期\\n\\n（AI 暂时连不上，这是基础数据，你先看着）`,
     actions: [
-      { label: '查看快速指令', action: 'quick-prompts' },
+      { label: '查看任务中心', action: 'view-tasks' },
       { label: '查看团队概况', action: 'view-overview' },
     ],
   };
 }
-
 // ─── Main Page ───
 export default function AiAssistant() {
+  const navigate = useNavigate();
+  const sessionIdRef = useRef<string>(`session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages);
 
-  const handleSendMessage = useCallback((content: string) => {
+  const handleActionClick = useCallback(async (action: string) => {
+    // 导航类动作
+    const navigationMap: Record<string, string> = {
+      'view-tasks': '/tasks',
+      'view-projects': '/',
+      'view-efficiency': '/',
+      'view-employees': '/employees',
+      'view-weekly': '/reports',
+      'view-overview': '/',
+      'view-feishu': '/feishu',
+    };
+
+    if (navigationMap[action]) {
+      navigate(navigationMap[action]);
+      return;
+    }
+
+    // 快捷指令
+    if (action === 'quick-prompts') {
+      toast.info('请在下方快捷指令中选择您想了解的内容');
+      return;
+    }
+
+    // 一键提醒逾期
+    if (action === 'remind-overdue') {
+      toast.info('正在获取逾期任务...');
+      try {
+        const [statsRes, tasksRes] = await Promise.all([
+          api.get<{ success: boolean; data: { total: number; overdue: number } }>('/api/tasks/stats/overview'),
+          api.get<{ success: boolean; data: any[] }>('/api/tasks'),
+        ]);
+        const overdueCount = statsRes.success ? statsRes.data.overdue : 0;
+        const allTasks = tasksRes.success ? tasksRes.data : [];
+        const overdueTasks = allTasks.filter((t: any) => {
+          if (t.status === 'overdue') return true;
+          if (t.due_date && t.status !== 'completed' && new Date(t.due_date) < new Date()) return true;
+          return false;
+        });
+
+        if (overdueTasks.length > 0) {
+          const taskLines = overdueTasks.slice(0, 8).map((t: any, i: number) =>
+            (i + 1) + '. ' + t.title + '（负责人: ' + (t.assignee_name || '未分配') + ', 截止: ' + (t.due_date || '未知') + '）'
+          ).join('\\n');
+
+          const aiMsg: ChatMessage = {
+            id: 'ai-remind-' + Date.now(),
+            role: 'ai',
+            content: '⚠️ 逾期任务提醒\\n\\n当前共有 ' + overdueTasks.length + ' 项逾期任务：\\n\\n' + taskLines + '\\n\\n📌 系统建议：\\n1. 立即通知相关责任人确认进度\\n2. 评估是否可调整 deadline\\n3. 对于关键路径任务，建议升级处理\\n\\n💡 可在任务中心查看详情并手动推动。',
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+            actions: [
+              { label: '查看任务中心', action: 'view-tasks' },
+              { label: '生成追赶计划', action: 'generate-plan' },
+            ],
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        } else {
+          const aiMsg: ChatMessage = {
+            id: 'ai-remind-' + Date.now(),
+            role: 'ai',
+            content: '✅ 好消息！当前没有逾期任务，团队执行状况良好。',
+            timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        }
+      } catch (e) {
+        toast.error('获取逾期任务失败');
+      }
+      return;
+    }
+
+    // 生成追赶计划
+    if (action === 'generate-plan') {
+      toast.info('正在基于实际数据生成追赶计划...');
+      try {
+        const [tasksRes, projectsRes] = await Promise.all([
+          api.get<{ success: boolean; data: any[] }>('/api/tasks'),
+          api.get<{ success: boolean; data: any[] }>('/api/projects'),
+        ]);
+        const overdue = tasksRes.success ? tasksRes.data.filter((t: any) => t.status !== 'completed' && t.due_date && new Date(t.due_date) < new Date()) : [];
+        const planLines = overdue.length > 0
+          ? overdue.slice(0, 5).map((t: any, i: number) => (i + 1) + '. ' + t.title + ' —— 建议责任人更新进度或申请延期').join('\\n')
+          : '当前所有任务进度正常，无需追赶计划。';
+
+        const aiMsg: ChatMessage = {
+          id: 'ai-plan-' + Date.now(),
+          role: 'ai',
+          content: '📋 追赶计划\\n\\n基于当前 ' + (tasksRes.success ? tasksRes.data.length : 0) + ' 项任务分析：\\n\\n' + planLines + '\\n\\n建议立即召开站会，明确每项逾期任务的下一步动作。',
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          actions: [
+            { label: '查看任务中心', action: 'view-tasks' },
+          ],
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      } catch {
+        toast.error('生成追赶计划失败');
+      }
+      return;
+    }
+
+    // 导出 PDF
+    if (action === 'export-pdf') {
+      toast.info('PDF 导出功能开发中，敬请期待');
+      return;
+    }
+
+    // 调整资源
+    if (action === 'adjust-resource') {
+      navigate('/employees');
+      toast.info('请在员工管理页面调整任务分配');
+      return;
+    }
+
+    // 未知 action
+    toast.info('正在执行: ' + action);
+  }, [navigate]);
+
+  const handleSendMessage = useCallback(async (content: string) => {
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -380,7 +761,9 @@ export default function AiAssistant() {
       timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const aiReply = generateAiResponse(content);
+    setMessages((prev) => [...prev, userMsg]);
+
+    const aiReply = await generateAiResponse(content, sessionIdRef.current);
 
     const aiResponse: ChatMessage = {
       id: `ai-${Date.now()}`,
@@ -389,8 +772,6 @@ export default function AiAssistant() {
       timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
       actions: aiReply.actions,
     };
-
-    setMessages((prev) => [...prev, userMsg]);
     setTimeout(() => {
       setMessages((prev) => [...prev, aiResponse]);
     }, 1200);
@@ -405,7 +786,7 @@ export default function AiAssistant() {
   );
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <Layout>
       <DataLoader />
       {/* Add CSS for gradient animation */}
       <style>{`
@@ -418,6 +799,13 @@ export default function AiAssistant() {
 
       <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         <PageHeader title="AI 智能助手" />
+
+        {/* ─── Structured Report Cards (moved to top) ─── */}
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <RiskReportCard />
+          <EfficiencyReportCard />
+          <SuggestionsReportCard />
+        </div>
 
         {/* ─── Header ─── */}
         <motion.div
@@ -474,7 +862,7 @@ export default function AiAssistant() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left: Chat (55%) */}
           <div className="flex-1 lg:max-w-[55%]">
-            <ChatInterface messages={messages} onSendMessage={handleSendMessage} />
+            <ChatInterface messages={messages} onSendMessage={handleSendMessage} onActionClick={handleActionClick} />
           </div>
 
           {/* Right: Insights Panel (45%) */}
@@ -485,18 +873,13 @@ export default function AiAssistant() {
             className="flex-1 lg:max-w-[45%] space-y-5"
           >
             <AiDecisionLog />
-            <AiCapabilitySwitches />
+            <TeamMemoryPanel />
+            <AiSettingsButton />
             <AiStatsPanel />
           </motion.div>
         </div>
 
-        {/* ─── Structured Report Cards ─── */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          <RiskReportCard />
-          <EfficiencyReportCard />
-          <SuggestionsReportCard />
-        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

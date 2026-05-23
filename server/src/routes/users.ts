@@ -2,14 +2,17 @@ import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { queryAll, queryOne, run } from '../utils/db';
 import { authMiddleware, AuthRequest, requireManager } from '../middleware/auth';
+import { syncUserToFeishu } from '../utils/larkCli';
 
 const router = Router();
 
 // 获取所有用户（管理员可看全部，员工只能看自己）
 router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    let sql = `SELECT u.id, u.name, u.email, u.role, u.department, u.avatar_url, u.created_at,
+    let sql = `SELECT u.id, u.name, u.email, u.phone, u.role, u.department, u.avatar_url, u.created_at,
         (SELECT COUNT(*) FROM tasks WHERE assignee_id = u.id) as tasks_count,
+        (SELECT COUNT(*) FROM tasks WHERE assignee_id = u.id AND status = 'completed') as tasks_completed,
+        (SELECT COUNT(*) FROM tasks WHERE assignee_id = u.id AND status = 'in-progress') as tasks_in_progress,
         (SELECT COUNT(*) FROM tasks WHERE created_by = u.id) as created_tasks_count
        FROM users u`;
     const values: any[] = [];
@@ -34,7 +37,7 @@ router.get('/:id', authMiddleware, async (req: AuthRequest, res) => {
     }
 
     const user = queryOne(
-      'SELECT id, name, email, role, department, avatar_url, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, phone, role, department, avatar_url, created_at FROM users WHERE id = ?',
       [req.params.id]
     );
 
@@ -70,7 +73,7 @@ router.put(
       return;
     }
 
-    const { name, role, department, avatarUrl } = req.body;
+    const { name, role, department, avatarUrl, email, phone } = req.body;
 
     if (req.user!.role !== 'manager' && req.user!.id !== req.params.id) {
       res.status(403).json({ success: false, message: '无权修改其他用户' });
@@ -85,6 +88,8 @@ router.put(
       if (role !== undefined) { fields.push('role = ?'); values.push(role); }
       if (department !== undefined) { fields.push('department = ?'); values.push(department); }
       if (avatarUrl !== undefined) { fields.push('avatar_url = ?'); values.push(avatarUrl); }
+      if (email !== undefined) { fields.push('email = ?'); values.push(email); }
+      if (phone !== undefined) { fields.push('phone = ?'); values.push(phone); }
 
       if (fields.length === 0) {
         res.status(400).json({ success: false, message: '没有要更新的字段' });
@@ -95,9 +100,20 @@ router.put(
       run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
 
       const user = queryOne(
-        'SELECT id, name, email, role, department, avatar_url FROM users WHERE id = ?',
+        'SELECT id, name, email, phone, role, department, avatar_url FROM users WHERE id = ?',
         [req.params.id]
       );
+
+      // 异步同步到飞书通讯录（不阻塞响应）
+      syncUserToFeishu({
+        userId: req.params.id,
+        name,
+        department,
+        email,
+        phone,
+      }).then(r => {
+        if (!r.success) console.log("[飞书同步]", r.message);
+      }).catch(e => console.error("[飞书同步异常]", e));
 
       res.json({ success: true, data: user });
     } catch (error) {

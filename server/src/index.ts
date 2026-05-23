@@ -10,6 +10,7 @@ import helpRequestRoutes from './routes/helpRequests';
 import feishuRoutes from './routes/feishu';
 import dashboardRoutes from './routes/dashboard';
 import systemDataRoutes from './routes/systemData';
+import aiRoutes from './routes/ai';
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use('/api/help-requests', helpRequestRoutes);
 app.use('/api/feishu', feishuRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/system-data', systemDataRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 处理
 app.use((_req, res) => {
@@ -89,6 +91,7 @@ async function runMigrations() {
       role TEXT DEFAULT 'employee' CHECK(role IN ('manager', 'employee')),
       department TEXT,
       avatar_url TEXT,
+      phone TEXT,
       feishu_open_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -100,6 +103,7 @@ async function runMigrations() {
       health_score INTEGER DEFAULT 100,
       progress INTEGER DEFAULT 0,
       status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'at-risk')),
+      owner_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -155,6 +159,33 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS system_data (
       data_key TEXT PRIMARY KEY,
       data_value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS ai_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('system', 'user', 'ai')),
+      content TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS team_context (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      category TEXT NOT NULL CHECK(category IN ('personnel', 'project', 'constraint', 'preference', 'decision')),
+      target_type TEXT NOT NULL CHECK(target_type IN ('user', 'project', 'task', 'team')),
+      target_id TEXT,
+      content TEXT NOT NULL,
+      impact TEXT DEFAULT 'note',
+      confidence REAL DEFAULT 0.5,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'expired', 'dismissed', 'applied')),
+      expires_at TEXT,
+      source_session_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);

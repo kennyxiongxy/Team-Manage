@@ -305,23 +305,71 @@ export interface ManagementSuggestion {
 
 // ─── AI Assistant Data ───
 
-export const arTeamMembers: TeamMember[] = [];
+export const arTeamMembers: TeamMember[] = [
+  { id: 'm1', name: '张伟', role: '大客户经理', status: 'online', workload: 85, tasksCompleted: 12, tasksInProgress: 3, currentTask: '中国银行年度框架合同续签' },
+  { id: 'm2', name: '李娜', role: '销售代表', status: 'busy', workload: 90, tasksCompleted: 8, tasksInProgress: 4, currentTask: '华为云POC演示准备' },
+  { id: 'm3', name: '王强', role: '渠道经理', status: 'online', workload: 60, tasksCompleted: 15, tasksInProgress: 2, currentTask: '渠道合作伙伴培训' },
+  { id: 'm4', name: '刘芳', role: '售前工程师', status: 'working', workload: 75, tasksCompleted: 10, tasksInProgress: 3, currentTask: '腾讯云迁移方案设计' },
+  { id: 'm5', name: '赵磊', role: '销售代表', status: 'offline', workload: 40, tasksCompleted: 7, tasksInProgress: 1, currentTask: '客户回访计划' },
+  { id: 'm6', name: '陈静', role: '客户成功经理', status: 'online', workload: 70, tasksCompleted: 9, tasksInProgress: 2, currentTask: 'VIP客户满意度调研' },
+  { id: 'm7', name: '杨光', role: '销售代表', status: 'idle', workload: 30, tasksCompleted: 5, tasksInProgress: 1, currentTask: '竞品分析报告' },
+];
 
 export const initialChatMessages: ChatMessage[] = [];
 
-export const quickPrompts: string[] = [];
+export const quickPrompts: string[] = [
+  '项目进度怎么样？',
+  '谁现在最忙？',
+  '给我本周的总结',
+  '有什么风险需要关注？',
+  '团队效率如何？',
+  '有什么优化建议？',
+];
 
-export const decisionLogs: DecisionLog[] = [];
+export const decisionLogs: DecisionLog[] = [
+  { id: 'dl-1', time: '09:15', type: 'allocation', status: 'applied', description: '将"华为云POC演示"任务自动分配给李娜（当前负载最低）' },
+  { id: 'dl-2', time: '10:02', type: 'remind', status: 'applied', description: '提醒张伟：中国银行合同续签倒计时 3 天' },
+  { id: 'dl-3', time: '10:30', type: 'analysis', status: 'completed', description: '分析本月销售漏斗，转化率环比上升 12%' },
+  { id: 'dl-4', time: '11:15', type: 'priority', status: 'applied', description: '将"腾讯云迁移方案"升级为高优先级（客户要求下周交付）' },
+  { id: 'dl-5', time: '13:45', type: 'suggest', status: 'pending', description: '建议为刘芳调配一名助手，当前负载过高' },
+  { id: 'dl-6', time: '14:20', type: 'deadline', status: 'applied', description: '检测到 3 项任务将在 48 小时内到期' },
+  { id: 'dl-7', time: '15:00', type: 'push', status: 'applied', description: '推送今日销售日报汇总到管理群' },
+  { id: 'dl-8', time: '16:10', type: 'analysis', status: 'completed', description: 'AI分析：赵磊本月业绩达标率偏低，建议一对一辅导' },
+  { id: 'dl-9', time: '17:30', type: 'review', status: 'pending', description: '生成明日工作优先级建议清单' },
+];
 
-export const aiCapabilities: AiCapability[] = [];
+export const aiCapabilities: AiCapability[] = [
+  { id: 'cap-1', name: '智能任务分配', description: '基于负荷和技能自动推荐任务分配', enabled: true },
+  { id: 'cap-2', name: '风险预测', description: '提前 48 小时预警潜在延期风险', enabled: true },
+  { id: 'cap-3', name: '日报生成', description: '自动汇总成员日报内容', enabled: true },
+  { id: 'cap-4', name: '效率优化', description: '分析工作模式，给出效率提升建议', enabled: false },
+  { id: 'cap-5', name: '智能排期', description: '根据任务依赖和资源自动排期', enabled: false },
+  { id: 'cap-6', name: '代码质量预警', description: '监控代码提交质量，提前发现隐患', enabled: false },
+];
 
 export const aiEffectiveness = { adoptionRate: 0, overdueReduction: 0, decisionTimeReduction: 0, weeklyAdoption: [], completionRateImprovement: [] };
 
-export const riskProjects: RiskProject[] = [];
+export const riskProjects: RiskProject[] = [
+  { name: '中国银行年度框架合同', lag: '滞后 3 天', issue: '法务审核进度缓慢，需管理层介入推动' },
+  { name: '腾讯云迁移方案', lag: '滞后 2 天', issue: '售前资源不足，刘芳一人承担多项任务' },
+  { name: '华为云联合POC', lag: '风险预警', issue: '演示环境准备进度 50%，距 deadline 仅 5 天' },
+];
 
-export const efficiencyRadarData: EfficiencyDimension[] = [];
+export const efficiencyRadarData: EfficiencyDimension[] = [
+  { subject: '任务完成率', A: 78 },
+  { subject: '客户响应', A: 85 },
+  { subject: '商机转化', A: 62 },
+  { subject: '协作效率', A: 70 },
+  { subject: '准时交付', A: 55 },
+  { subject: '客户满意', A: 88 },
+];
 
-export const managementSuggestions: ManagementSuggestion[] = [];
+export const managementSuggestions: ManagementSuggestion[] = [
+  { id: 1, text: '赵磊本月产出偏低，建议安排一对一谈话了解原因', priority: 'high' },
+  { id: 2, text: '中国银行合同续签已滞后，建议亲自拜访客户加快流程', priority: 'high' },
+  { id: 3, text: '销售漏斗转化率提升明显，可考虑加大线索投放预算', priority: 'low' },
+  { id: 4, text: '建议周五下午组织团队销售技巧分享会', priority: 'low' },
+];
 
 // ─── Reports Types ───
 

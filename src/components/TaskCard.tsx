@@ -1,58 +1,152 @@
 import { memo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, CheckCircle, MessageSquare, Zap, Bot, X, RotateCcw, Lightbulb, Clock, Users } from 'lucide-react';
+import { Sparkles, CheckCircle, MessageSquare, Zap, Bot, X, RotateCcw, Lightbulb, Clock, Users, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import StatusBadge from './StatusBadge';
 import type { Task } from '@/data/mockData';
+import { api } from '@/api/client';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface TaskCardProps {
   task: Task;
   index?: number;
   onClick?: () => void;
+  onTaskUpdated?: () => void;
 }
 
 const priorityColors: Record<string, string> = {
   urgent: '#EF4444',
   high: '#F97316',
-  normal: '#3B82F6',
+  medium: '#3B82F6',
   low: '#22C55E',
 };
 
+// 状态映射：API 英文状态 -> 中文展示
+const statusDisplay: Record<string, string> = {
+  'completed': '已完成',
+  'in-progress': '进行中',
+  'not-started': '未开始',
+  'overdue': '已逾期',
+  'pending-review': '待审核',
+};
 
+// 反向映射：中文展示 -> API 英文状态
+const statusToApi: Record<string, string> = {
+  '已完成': 'completed',
+  '进行中': 'in-progress',
+  '未开始': 'not-started',
+  '已逾期': 'overdue',
+  '待审核': 'pending-review',
+};
 
-const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardProps) {
+const TaskCard = memo(function TaskCard({ task, index = 0, onClick, onTaskUpdated }: TaskCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isMarkedDone, setIsMarkedDone] = useState(task.status === '已完成');
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showRemarkInput, setShowRemarkInput] = useState(false);
+  const [remarkText, setRemarkText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+
+  const isCompleted = task.status === 'completed';
+  const isOverdue = task.status === 'overdue' || (task.dueDate && new Date(task.dueDate) < new Date() && !isCompleted);
   const priorityColor = priorityColors[task.priority];
 
-  const isOverdue = task.status === 'overdue' || task.status === '已逾期';
-  const isToday = task.dueDate === '2024-07-15' && !isOverdue;
-  const dueColor = isOverdue ? '#EF4444' : isToday ? '#EF4444' : '#94A3B8';
-
-  const handleToggleComplete = (e: React.MouseEvent) => {
+  // ─── 完成/撤回 ───
+  const handleToggleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isMarkedDone) {
-      setIsMarkedDone(false);
-      toast.info('已撤回完成标记', { description: task.title });
-    } else {
-      setIsMarkedDone(true);
-      toast.success('已标记完成', { description: task.title });
+    setIsSubmitting(true);
+    try {
+      const newStatus = isCompleted ? 'in-progress' : 'completed';
+      await api.put(`/api/tasks/${task.id}`, { status: newStatus });
+      toast.success(isCompleted ? '已撤回完成标记' : '已标记完成', { description: task.title });
+      onTaskUpdated?.();
+    } catch {
+      toast.error('操作失败，请重试');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleAiAnalysis = (e: React.MouseEvent) => {
+  // ─── 备注 ───
+  const handleRemarkClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowAiPanel(true);
-    toast.success('AI 分析完成', { description: task.title });
+    setShowRemarkInput(!showRemarkInput);
   };
 
-  // AI 分析建议数据
-  const aiSuggestions = [
-    { icon: Clock, text: `建议截止前${isOverdue ? '已逾期，请立即处理' : '2小时'}完成`, color: isOverdue ? '#EF4444' : '#3B82F6' },
-    { icon: Users, text: `${task.assignee}当前负荷${task.priority === 'urgent' || task.priority === 'P0' ? '较高' : '适中'}，建议${task.collaboratorIds && task.collaboratorIds.length > 0 ? '协同' : '单独'}推进`, color: '#A855F7' },
-    { icon: Lightbulb, text: `此任务${task.progress > 50 ? '进度过半，保持节奏' : '进度滞后，建议拆分'}`, color: '#F97316' },
-  ];
+  const handleSubmitRemark = async () => {
+    if (!remarkText.trim()) {
+      setShowRemarkInput(false);
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.put(`/api/tasks/${task.id}`, { description: remarkText.trim() });
+      toast.success('备注已保存', { description: remarkText.trim().slice(0, 30) });
+      setRemarkText('');
+      setShowRemarkInput(false);
+      onTaskUpdated?.();
+    } catch {
+      toast.error('保存备注失败');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ─── 催促 ───
+  const handleNudge = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsSubmitting(true);
+    try {
+      // 获取任务最新信息确认负责人
+      const res = await api.get<{ success: boolean; data: any }>(`/api/tasks/${task.id}`);
+      const assigneeName = res.success ? res.data.assignee_name : task.assignee;
+      await api.put(`/api/tasks/${task.id}`, { priority: 'high' });
+      toast.success(`已催促 ${assigneeName || '负责人'}`, {
+        description: `任务「${task.title.slice(0, 20)}...」优先级已提升为高`,
+      });
+      onTaskUpdated?.();
+    } catch {
+      toast.error('催促失败，请重试');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ─── AI 分析 ───
+  const handleAiAnalysis = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (showAiPanel) {
+      setShowAiPanel(false);
+      setAiResponse(null);
+      return;
+    }
+    setShowAiPanel(true);
+    if (aiResponse) return; // 已有结果，不重复请求
+
+    setAiLoading(true);
+    try {
+      const res = await api.post<{ success: boolean; data: { reply: string } }>('/api/ai/chat', {
+        message: `分析这个任务：${task.title}，当前进度 ${task.progress}%，状态 ${statusDisplay[task.status] || task.status}，负责人 ${task.assignee}，截止日期 ${task.dueDate}。给出具体的风险判断和行动建议。`,
+        context: {
+          taskCount: 1,
+          inProgressCount: 1,
+          overdueCount: isOverdue ? 1 : 0,
+          recentTasks: [`${task.title}（负责人: ${task.assignee}, 进度: ${task.progress}%）`],
+        },
+      });
+      if (res.success) {
+        setAiResponse(res.data.reply);
+      }
+    } catch {
+      setAiResponse('AI 分析暂时不可用，请稍后重试');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const displayStatus = statusDisplay[task.status] || task.status;
 
   return (
     <motion.div
@@ -67,11 +161,9 @@ const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardPr
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onClick?.()}
-      className={`
-        bg-muted rounded-xl p-3 relative overflow-hidden transition-colors duration-200 cursor-pointer
-        ${isOverdue ? 'border-l-2 border-l-destructive bg-destructive/5' : ''}
-        ${isHovered ? 'bg-muted' : ''}
-      `}
+      className={`bg-muted rounded-xl p-3 relative overflow-hidden transition-colors duration-200 cursor-pointer ${
+        isOverdue ? 'border-l-2 border-l-destructive bg-destructive/5' : ''
+      }`}
       style={{
         transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
         boxShadow: isHovered ? 'var(--shadow-hover)' : 'var(--shadow-card)',
@@ -85,46 +177,84 @@ const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardPr
       <div className="flex items-start justify-between gap-2 mt-1">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <h4 className="text-body font-semibold text-foreground truncate">{task.title}</h4>
-          {(task.aiRecommended || showAiPanel) && (
+          {(task.aiRecommended || aiResponse) && (
             <Sparkles size={14} className="text-[#A855F7] flex-shrink-0" />
           )}
         </div>
-        <span className="text-caption font-medium flex-shrink-0" style={{ color: dueColor }}>
+        <span className="text-caption font-medium flex-shrink-0" style={{ color: isOverdue ? '#EF4444' : '#94A3B8' }}>
           {task.dueTime || task.dueDate}
         </span>
       </div>
 
-      {/* Project + Description */}
+      {/* Project + Description / Remark */}
       <div className="mt-1 flex items-center gap-2">
-        <span className="text-caption px-1.5 py-0.5 rounded bg-card text-muted-foreground">
+        <span className="text-caption px-1.5 py-0.5 rounded bg-card text-muted-foreground shrink-0">
           {task.project}
         </span>
-        <p className="text-body text-muted-foreground truncate">{task.description}</p>
+        {task.description ? (
+          <div className="flex items-center gap-1.5 min-w-0 flex-1" title={task.description}>
+            <MessageSquare size={10} className="text-[#60a5fa] shrink-0" />
+            <span className="text-body text-[#93c5fd] truncate">{task.description}</span>
+          </div>
+        ) : (
+          <span className="text-body text-muted-foreground/40 text-xs italic">暂无备注</span>
+        )}
       </div>
 
       {/* Bottom row: Assignee + Progress + Status */}
       <div className="mt-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-caption font-semibold text-foreground">
-            {task.assignee.charAt(0)}
+            {task.assignee?.charAt(0) || '?'}
           </div>
-          <span className="text-body text-foreground">{task.assignee}</span>
+          <span className="text-body text-foreground">{task.assignee || '未分配'}</span>
         </div>
 
-        {/* Progress bar */}
         <div className="flex-1 max-w-[120px]">
           <div className="h-1.5 bg-card rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${isMarkedDone ? 100 : task.progress}%` }}
+              animate={{ width: `${isCompleted ? 100 : task.progress}%` }}
               transition={{ duration: 0.8, delay: index * 0.06 + 0.3, ease: 'easeOut' }}
               className="h-full rounded-full gradient-progress"
             />
           </div>
         </div>
 
-        <StatusBadge status={isMarkedDone ? '已完成' : task.status} />
+        <StatusBadge status={displayStatus} />
       </div>
+
+      {/* Remark input */}
+      <AnimatePresence>
+        {showRemarkInput && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="mt-3 pt-3 border-t border-border overflow-hidden"
+          >
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={remarkText}
+                onChange={(e) => setRemarkText(e.target.value)}
+                placeholder="添加备注..."
+                className="flex-1 bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-accent"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmitRemark(); if (e.key === 'Escape') setShowRemarkInput(false); }}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); handleSubmitRemark(); }}
+                disabled={isSubmitting}
+                className="px-3 py-2 bg-accent text-white rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* AI Analysis Panel */}
       <AnimatePresence>
@@ -139,7 +269,7 @@ const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardPr
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[#A855F7]" />
-                <span className="text-sm font-semibold text-[#A855F7]">AI 智能分析</span>
+                <span className="text-sm font-semibold text-[#A855F7]">AI 分析</span>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); setShowAiPanel(false); }}
@@ -148,58 +278,52 @@ const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardPr
                 <X size={14} />
               </button>
             </div>
-            <div className="space-y-2">
-              {aiSuggestions.map((suggestion, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ x: -10, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-start gap-2 text-xs"
-                >
-                  <suggestion.icon size={14} style={{ color: suggestion.color }} className="mt-0.5 flex-shrink-0" />
-                  <span className="text-muted-foreground">{suggestion.text}</span>
-                </motion.div>
-              ))}
-            </div>
+            {aiLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-4">
+                <Loader2 size={14} className="animate-spin" />
+                正在调用 AI 分析此任务...
+              </div>
+            ) : aiResponse ? (
+              <MarkdownRenderer content={aiResponse} />
+            ) : (
+              <div className="text-xs text-muted-foreground py-2">AI 分析加载失败</div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Hover quick actions overlay */}
-      {isHovered && !showAiPanel && (
-        <motion.div
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-0 left-0 right-0 flex items-center gap-1.5 p-2 rounded-b-xl bg-muted/95 backdrop-blur-sm border-t border-border z-10"
-        >
+      <AnimatePresence>
+        {isHovered && !showAiPanel && !showRemarkInput && (
+          <motion.div
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 5 }}
+            className="absolute bottom-0 left-0 right-0 flex items-center gap-1.5 p-2 rounded-b-xl bg-muted/95 backdrop-blur-sm border-t border-border z-10"
+          >
           <button
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors flex-1 justify-center"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors flex-1 justify-center disabled:opacity-50"
             style={{
-              backgroundColor: isMarkedDone ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
-              color: isMarkedDone ? '#EF4444' : '#22C55E',
+              backgroundColor: isCompleted ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+              color: isCompleted ? '#EF4444' : '#22C55E',
             }}
             onClick={handleToggleComplete}
+            disabled={isSubmitting}
           >
-            {isMarkedDone ? <RotateCcw size={11} /> : <CheckCircle size={11} />}
-            {isMarkedDone ? '撤回' : '完成'}
+            {isCompleted ? <RotateCcw size={11} /> : <CheckCircle size={11} />}
+            {isCompleted ? '撤回' : '完成'}
           </button>
           <button
             className="flex items-center gap-1 px-2 py-1 rounded-md bg-[rgba(59,130,246,0.15)] text-primary text-[11px] font-medium hover:bg-[rgba(59,130,246,0.25)] transition-colors flex-1 justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.info('添加备注', { description: task.title });
-            }}
+            onClick={handleRemarkClick}
           >
             <MessageSquare size={11} />
             备注
           </button>
           <button
-            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[rgba(249,115,22,0.15)] text-[#F97316] text-[11px] font-medium hover:bg-[rgba(249,115,22,0.25)] transition-colors flex-1 justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              toast.warning('已发送催促', { description: task.title });
-            }}
+            className="flex items-center gap-1 px-2 py-1 rounded-md bg-[rgba(249,115,22,0.15)] text-[#F97316] text-[11px] font-medium hover:bg-[rgba(249,115,22,0.25)] transition-colors flex-1 justify-center disabled:opacity-50"
+            onClick={handleNudge}
+            disabled={isSubmitting}
           >
             <Zap size={11} />
             催促
@@ -213,6 +337,7 @@ const TaskCard = memo(function TaskCard({ task, index = 0, onClick }: TaskCardPr
           </button>
         </motion.div>
       )}
+      </AnimatePresence>
     </motion.div>
   );
 });

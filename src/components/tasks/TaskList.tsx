@@ -9,8 +9,6 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import {
-  mockTeamMembers,
-  mockProjects,
   priorityConfig,
   statusConfig,
 } from '@/data/mockData';
@@ -28,18 +26,14 @@ type SortDir = 'asc' | 'desc';
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(memberId: string) {
-  return mockTeamMembers.find((m) => m.id === memberId);
-}
+function getMember(assigneeName: string) { if (assigneeName && assigneeName !== '未分配') return { name: assigneeName, avatar: '' }; return null; }
 
-function getProject(projectId: string) {
-  return mockProjects.find((p) => p.id === projectId);
-}
+function getProject(projectName: string) { if (projectName && projectName !== '未分配') return { name: projectName, color: '#3B82F6' }; return null; }
 
-const priorityOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 
 function isOverdue(dueDate: string, status: TaskStatus) {
-  return new Date(dueDate) < new Date() && status !== '已完成';
+  return new Date(dueDate) < new Date() && status !== 'completed';
 }
 
 export default function TaskList({
@@ -168,8 +162,8 @@ export default function TaskList({
           <tbody>
             <AnimatePresence>
               {sortedTasks.map((task, idx) => {
-                const member = getMember(task.assigneeId ?? '');
-                const project = getProject(task.projectId ?? '');
+                const member = getMember(task.assignee ?? '');
+                const project = getProject(task.project ?? '');
                 const priority = priorityConfig[task.priority];
                 const status = statusConfig[task.status];
                 const selected = selectedIds.includes(task.id);

@@ -12,6 +12,7 @@ import TrendCharts from '@/components/team-analysis/TrendCharts';
 import AiActionPlan from '@/components/team-analysis/AiActionPlan';
 import PageHeader from '@/components/PageHeader';
 import { kpiData } from '@/data/mockData';
+import Layout from '@/components/Layout';
 
 const stagger = { animate: { transition: { staggerChildren: 0.08 } } };
 const fadeUp = {
@@ -87,7 +88,7 @@ export default function TeamAnalysis() {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <Layout>
       {/* Main Content */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
         <PageHeader title="团队分析" subtitle="数据驱动的管理决策支持" />
@@ -190,6 +191,6 @@ export default function TeamAnalysis() {
         {/* Footer spacer */}
         <div className="h-8" />
       </div>
-    </div>
+    </Layout>
   );
 }

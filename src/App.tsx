@@ -15,8 +15,6 @@ import TeamAnalysis from './pages/TeamAnalysis'
 import EmployeeManagement from './pages/EmployeeManagement'
 import HelpRequestManagement from './pages/HelpRequestManagement'
 import FeishuIntegration from './pages/FeishuIntegration'
-import FeishuMapping from './pages/FeishuMapping'
-import FeishuSync from './pages/FeishuSync'
 import Settings from './pages/Settings'
 import PerformanceFeedback from './pages/PerformanceFeedback'
 import Login from './pages/Login'
@@ -80,8 +78,6 @@ function AppRoutes() {
         element={<RequireAuth>{isEmployee ? <Navigate to="/workspace" replace /> : <TeamAnalysis />}</RequireAuth>}
       />
       <Route path="/feishu" element={<RequireAuth><FeishuIntegration /></RequireAuth>} />
-      <Route path="/feishu-mapping" element={<RequireAuth><FeishuMapping /></RequireAuth>} />
-      <Route path="/feishu-sync" element={<RequireAuth><FeishuSync /></RequireAuth>} />
       <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
       <Route path="/performance" element={<RequireAuth><PerformanceFeedback /></RequireAuth>} />
     </Routes>

@@ -18,6 +18,7 @@ import {
 } from '@/data/mockData';
 import { useSystemData } from '@/hooks/useSystemData';
 import { cn } from '@/lib/utils';
+import Layout from '@/components/Layout';
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
@@ -398,7 +399,7 @@ export default function Reports() {
   const effectiveWeeklyHistory = weeklyHistoryData || fallbackWeeklyHistory;
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <Layout>
       <div className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
         <PageHeader title="日报与周报" subtitle="AI 自动汇总 · 管理者深度分析 · 员工简洁日报" />
 
@@ -569,6 +570,6 @@ export default function Reports() {
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </Layout>
   );
 }

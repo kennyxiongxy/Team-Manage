@@ -29,8 +29,13 @@ const statusConfig = {
   dismissed: { icon: XCircle, color: 'text-muted-foreground', label: '已忽略' },
 };
 
+const PAGE_SIZE = 6;
+
 export default function AiDecisionLog() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(decisionLogs.length / PAGE_SIZE));
+  const pagedLogs = decisionLogs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <div className="rounded-2xl bg-muted border border-border p-5">
@@ -64,7 +69,7 @@ export default function AiDecisionLog() {
             <p className="text-xs mt-1">连接飞书并开启 AI 自动化后将显示决策日志</p>
           </div>
         ) : (
-          decisionLogs.map((log, index) => (
+          pagedLogs.map((log, index) => (
             <LogItem
               key={log.id}
               log={log}
@@ -75,6 +80,44 @@ export default function AiDecisionLog() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+          <span className="text-xs text-muted-foreground">
+            {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, decisionLogs.length)} / {decisionLogs.length}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              上一页
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setPage(i)}
+                className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
+                  i === page
+                    ? 'bg-accent text-white'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

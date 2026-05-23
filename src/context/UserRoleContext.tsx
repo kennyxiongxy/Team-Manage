@@ -18,6 +18,7 @@ interface UserRoleContextType {
   login: (token: string, user: UserInfo) => void;
   logout: () => void;
   switchRole: (role: UserRole) => void;
+  updateUserInfo: (updates: Partial<UserInfo>) => void;
   isManager: boolean;
   isEmployee: boolean;
   loading: boolean;
@@ -84,6 +85,16 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUserInfo = (updates: Partial<UserInfo>) => {
+    setUser(prev => {
+      const next = { ...prev, ...updates };
+      if (token) {
+        localStorage.setItem('user', JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
   return (
     <UserRoleContext.Provider
       value={{
@@ -93,6 +104,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         switchRole,
+        updateUserInfo,
         isManager: user.role === 'manager',
         isEmployee: user.role === 'employee',
         loading,

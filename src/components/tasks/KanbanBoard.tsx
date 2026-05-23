@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Calendar, MessageSquare, Paperclip } from 'lucide-react';
-import { mockTeamMembers, mockProjects, priorityConfig, statusConfig } from '@/data/mockData';
+import { priorityConfig, statusConfig } from '@/data/mockData';
 import type { Task, TaskStatus } from '@/data/mockData';
 
 interface KanbanBoardProps {
@@ -19,16 +19,12 @@ const columns: { status: TaskStatus; label: string; color: string }[] = [
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(memberId: string) {
-  return mockTeamMembers.find((m) => m.id === memberId);
-}
+function getMember(task: any) { if (task.assignee && task.assignee !== "未分配") return { name: task.assignee, avatar: "" }; return null; }
 
-function getProject(projectId: string) {
-  return mockProjects.find((p) => p.id === projectId);
-}
+function getProject(task: any) { if (task.project && task.project !== "未分配") return { name: task.project, color: "#3B82F6" }; return null; }
 
 function isOverdue(dueDate: string, status: TaskStatus) {
-  return new Date(dueDate) < new Date() && status !== '已完成';
+  return new Date(dueDate) < new Date() && status !== 'completed';
 }
 
 function isDueToday(dueDate: string) {

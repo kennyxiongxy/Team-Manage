@@ -10,10 +10,11 @@ const router = Router();
 router.get('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const projects = queryAll(
-      `SELECT p.*,
+      `SELECT p.*, u.name as owner_name,
         COUNT(t.id) as total_tasks,
         COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completed_tasks
        FROM projects p
+       LEFT JOIN users u ON p.owner_id = u.id
        LEFT JOIN tasks t ON p.id = t.project_id
        GROUP BY p.id
        ORDER BY p.created_at DESC`
@@ -74,10 +75,11 @@ router.post(
 
     try {
       const id = uuidv4().replace(/-/g, '').substring(0, 32);
+      const owner_id = req.body.owner_id || null;
       run(
-        `INSERT INTO projects (id, name, health_score, progress, status)
-         VALUES (?, ?, ?, ?, ?)`,
-        [id, name, healthScore || 100, progress || 0, status || 'active']
+        `INSERT INTO projects (id, name, health_score, progress, status, owner_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, name, healthScore || 100, progress || 0, status || 'active', owner_id]
       );
 
       const project = queryOne('SELECT * FROM projects WHERE id = ?', [id]);
@@ -111,6 +113,7 @@ router.put(
       if (healthScore !== undefined) { fields.push('health_score = ?'); values.push(healthScore); }
       if (progress !== undefined) { fields.push('progress = ?'); values.push(progress); }
       if (status !== undefined) { fields.push('status = ?'); values.push(status); }
+      if (req.body.owner_id !== undefined) { fields.push('owner_id = ?'); values.push(req.body.owner_id); }
 
       if (fields.length === 0) {
         res.status(400).json({ success: false, message: '没有要更新的字段' });

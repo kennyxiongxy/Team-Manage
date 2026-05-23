@@ -46,7 +46,18 @@ const systemData: Record<string, any> = {
   // ─── AI 助手数据 ───
   arTeamMembers: [],
 
-  initialChatMessages: [],
+  initialChatMessages: [
+    {
+      id: 'welcome',
+      role: 'ai',
+      content: '👋 您好！我是您的 AI 管理助手「统御」。\\n\\n当前系统中有 30 项任务、7 个项目、8 名团队成员。\\n\\n我可以帮您分析以下内容：\\n• 📊 项目进度与风险\\n• 👥 人员效率与负荷\\n• 📋 任务分配与跟踪\\n• 📈 周报日报生成\\n• 💡 管理建议与优化\\n\\n请告诉我您想了解什么，我会为您深入分析团队数据。',
+      timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      actions: [
+        { label: '查看任务概览', action: 'view-tasks' },
+        { label: '分析团队效率', action: 'view-efficiency' },
+      ],
+    },
+  ],
   quickPrompts: [],
   decisionLogs: [],
 

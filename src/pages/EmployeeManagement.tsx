@@ -131,9 +131,9 @@ function EmployeeDetailModal({ member, onClose }: { member: TeamMember; onClose:
 
   const stats = [
     { label: '完成任务', value: member.tasksCompleted || 0, icon: Target, color: '#3B82F6' },
-    { label: '平均耗时', value: `${member.avgTaskDuration || 0}天`, icon: Clock, color: '#F97316' },
+    { label: '平均耗时', value: typeof member.avgTaskDuration === 'number' ? `${member.avgTaskDuration}天` : (member.avgTaskDuration || '0天'), icon: Clock, color: '#F97316' },
     { label: '协作频次', value: member.collabCount || 0, icon: Users, color: '#06B6D4' },
-    { label: '周环比', value: `${member.weekOverWeek || 0 > 0 ? '+' : ''}${member.weekOverWeek || 0}%`, icon: TrendingUp, color: '#22C55E' },
+    { label: '周环比', value: `${(member.weekOverWeek || 0) > 0 ? '+' : ''}${member.weekOverWeek || 0}%`, icon: TrendingUp, color: '#22C55E' },
   ];
 
   const radar = member.radar || { completion: 0, onTime: 0, quality: 0, workload: 0, collaboration: 0 };

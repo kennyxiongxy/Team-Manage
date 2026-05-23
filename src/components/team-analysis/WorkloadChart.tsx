@@ -136,13 +136,13 @@ export default function WorkloadChart() {
                   <p className="text-muted-foreground text-xs mt-1">{rec.dataSupport}</p>
                   <div className="flex gap-2 mt-2">
                     <button
-                      onClick={() => toast.success('人员调配指令已发送')}
+                      onClick={() => window.location.hash = '#/employees'}
                       className="flex items-center gap-1 bg-gradient-to-r from-[#A855F7] to-[#3B82F6] text-primary-foreground text-xs px-3 py-1.5 rounded-md hover:brightness-110 transition-all"
                     >
                       <Play className="w-3 h-3" /> 执行调配
                     </button>
                     <button
-                      onClick={() => toast.info('功能开发中，敬请期待', { duration: 2000 })}
+                      onClick={() => window.location.hash = '#/employees'}
                       className="text-muted-foreground text-xs px-3 py-1.5 rounded-md hover:bg-muted transition-all"
                     >
                       查看详情
@@ -163,7 +163,7 @@ export default function WorkloadChart() {
                   <p className="text-muted-foreground text-xs mt-1">{rec.dataSupport}</p>
                   <div className="flex gap-2 mt-2">
                     <button
-                      onClick={() => toast.success('方案已生成并发送到您的飞书')}
+                      onClick={() => window.location.hash = '#/feishu'}
                       className="text-muted-foreground text-xs px-3 py-1.5 rounded-md hover:bg-muted transition-all"
                     >
                       {rec.action}
@@ -178,7 +178,7 @@ export default function WorkloadChart() {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => toast.success('人员调配指令已发送')}
+          onClick={() => window.location.hash = '#/employees'}
           className="w-full mt-5 py-2.5 rounded-lg text-sm font-semibold text-primary-foreground bg-gradient-to-r from-[#A855F7] via-[#3B82F6] to-[#06B6D4] hover:brightness-110 transition-all"
           style={{ backgroundSize: '200% 200%' }}
         >

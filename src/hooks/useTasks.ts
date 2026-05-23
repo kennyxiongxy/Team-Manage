@@ -12,7 +12,7 @@ function mapBackendTask(t: any): Task {
     assignee: t.assignee_name || '未分配',
     assigneeAvatar: t.assignee_avatar || '',
     dueDate: t.due_date || '',
-    startDate: t.start_date || '',
+    startDate: t.start_date || t.due_date || '',
     progress: t.progress || 0,
     project: t.project_name || '未分配',
     projectId: t.project_id || '',

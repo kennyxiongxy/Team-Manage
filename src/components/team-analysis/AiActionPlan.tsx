@@ -114,7 +114,7 @@ export default function AiActionPlan() {
                 style={{ color: plan.color }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  toast.success('人员调配指令已发送');
+                  window.location.hash = '#/employees';
                 }}
               >
                 {plan.button} <ArrowRight className="w-4 h-4" />

@@ -30,6 +30,7 @@ import TaskList from '@/components/tasks/TaskList';
 import CreateTaskModal from '@/components/tasks/CreateTaskModal';
 import TaskDetailPanel from '@/components/tasks/TaskDetailPanel';
 import PageHeader from '@/components/PageHeader';
+import Layout from '@/components/Layout';
 
 type ViewMode = 'kanban' | 'gantt' | 'list';
 
@@ -77,7 +78,7 @@ export default function TaskCenter() {
   const handleStatusChange = useCallback(
     async (taskId: string, newStatus: TaskStatus) => {
       const updates: any = { status: newStatus };
-      if (newStatus === 'completed' || newStatus === '已完成') {
+      if (newStatus === 'completed') {
         updates.progress = 100;
       }
       try {
@@ -137,7 +138,7 @@ export default function TaskCenter() {
           projectId: newTask.projectId || null,
           assigneeId: newTask.assigneeId || null,
           priority: newTask.priority,
-          status: newTask.status === '未开始' ? 'not-started' : newTask.status === '进行中' ? 'in-progress' : newTask.status === '待审核' ? 'pending-review' : newTask.status === '已完成' ? 'completed' : newTask.status,
+          status: newTask.status,
           dueDate: newTask.dueDate,
         });
         toast.success('任务创建成功');
@@ -172,12 +173,12 @@ export default function TaskCenter() {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <Layout>
       <PageHeader title={isEmployee ? "我的任务" : "任务中心"} />
 
       {/* Header Control Bar */}
       <motion.div
-        className="sticky top-0 z-30 bg-card border-b border-border"
+        className="sticky top-16 z-30 bg-card border-b border-border"
         initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: easeValues }}
@@ -188,7 +189,7 @@ export default function TaskCenter() {
             <div className="flex items-center gap-4">
               <div>
                 <span className="text-xs text-muted-foreground">
-                  {tasksLoading ? '加载中...' : isEmployee ? `您有 ${filteredTasks.filter(t => t.status === '进行中' || t.status === 'in-progress').length} 个进行中任务` : `${filteredTasks.length} 个任务`}
+                  {tasksLoading ? '加载中...' : isEmployee ? `您有 ${filteredTasks.filter(t => t.status === 'in-progress').length} 个进行中任务` : `${filteredTasks.length} 个任务`}
                 </span>
               </div>
 
@@ -457,6 +458,6 @@ export default function TaskCenter() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </Layout>
   );
 }

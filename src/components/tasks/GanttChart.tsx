@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { mockTeamMembers, mockProjects, priorityConfig } from '@/data/mockData';
-import type { Task, Priority } from '@/data/mockData';
+import { priorityConfig } from '@/data/mockData';
+import type { Task } from '@/data/mockData';
 
 interface GanttChartProps {
   tasks: Task[];
@@ -9,20 +9,27 @@ interface GanttChartProps {
 }
 
 const priorityBarColors: Record<string, string> = {
-  P0: '#EF4444',
-  P1: '#F97316',
-  P2: '#3B82F6',
-  P3: '#94A3B8',
+  urgent: '#EF4444',
+  high: '#F97316',
+  medium: '#3B82F6',
+  low: '#22C55E',
 };
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(memberId: string) {
-  return mockTeamMembers.find((m) => m.id === memberId);
+function getMember(task: any) {
+  // Real data: assignee is a string name, not an ID
+  if (task.assignee && task.assignee !== '未分配') {
+    return { name: task.assignee, avatar: '' };
+  }
+  return null;
 }
 
-function getProject(projectId: string) {
-  return mockProjects.find((p) => p.id === projectId);
+function getProject(task: any) {
+  if (task.project && task.project !== '未分配') {
+    return { name: task.project, color: '#3B82F6' };
+  }
+  return null;
 }
 
 function addDays(dateStr: string, days: number) {
@@ -41,16 +48,17 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
   const [zoom, setZoom] = useState<'day' | 'week'>('day');
 
   const { dateRange, days } = useMemo(() => {
-    if (tasks.length === 0) {
-      const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    if (tasks.length === 0 || !tasks.some((t: Task) => t.dueDate)) {
       return { dateRange: [today, addDays(today, 14)], days: 15 };
     }
-    let minDate = tasks[0].startDate ?? tasks[0].dueDate;
+    const sd = (t: Task) => t.startDate || t.dueDate;
+    let minDate = sd(tasks[0]);
     let maxDate = tasks[0].dueDate;
     tasks.forEach((t) => {
-      const s = t.startDate ?? t.dueDate;
-      if (s < minDate) minDate = s;
-      if (t.dueDate > maxDate) maxDate = t.dueDate;
+      const s = sd(t);
+      if (s && s < minDate) minDate = s;
+      if (t.dueDate && t.dueDate > maxDate) maxDate = t.dueDate;
     });
     // Add padding
     minDate = addDays(minDate, -2);
@@ -82,11 +90,14 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
     return labels;
   }, [dateRange, days, zoom]);
 
-  const getTaskOffset = (startDate: string) => {
+  const getTaskOffset = (task: Task) => {
+    const startDate = task.startDate || task.dueDate;
     return diffDays(dateRange[0], startDate) * dayWidth;
   };
 
-  const getTaskWidth = (startDate: string, dueDate: string) => {
+  const getTaskWidth = (task: Task) => {
+    const startDate = task.startDate || task.dueDate;
+    const dueDate = task.dueDate;
     const w = Math.max(diffDays(startDate, dueDate) + 1, 1) * dayWidth;
     return w;
   };
@@ -166,8 +177,8 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
             const member = getMember(task.assigneeId ?? '');
             const priority = priorityConfig[task.priority];
             const barColor = priorityBarColors[task.priority];
-            const offset = getTaskOffset(task.startDate ?? task.dueDate);
-            const width = getTaskWidth(task.startDate ?? task.dueDate, task.dueDate);
+            const offset = getTaskOffset(task);
+            const width = getTaskWidth(task);
 
             return (
               <motion.div
@@ -194,13 +205,11 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
                   <div className="w-[70px] px-3 py-2.5 border-r border-border flex items-center">
                     {member && (
                       <div className="flex items-center gap-1.5">
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-5 h-5 rounded-full"
-                        />
+                        <div className="w-5 h-5 rounded-full bg-accent/30 flex items-center justify-center text-[10px] font-bold text-accent">
+                          {member.name.charAt(0)}
+                        </div>
                         <span className="text-[10px] text-muted-foreground">
-                          {member.name.slice(0, 2)}
+                          {member.name.slice(0, 3)}
                         </span>
                       </div>
                     )}

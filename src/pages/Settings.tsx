@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import Layout from '@/components/Layout';
 import PageHeader from '@/components/PageHeader';
 import { useTheme } from '@/context/ThemeContext';
+import { api } from '@/api/client';
 import { useUserRole } from '@/context/UserRoleContext';
 
 function SettingSection({ title, icon: Icon, children }: { title: string; icon: any; children: React.ReactNode }) {
@@ -48,7 +49,7 @@ function ToggleRow({ label, description, enabled, onToggle }: { label: string; d
 }
 
 export default function Settings() {
-  const { user } = useUserRole();
+  const { user, updateUserInfo } = useUserRole();
   const { theme, toggleTheme } = useTheme();
   const [avatarHover, setAvatarHover] = useState(false);
   const [form, setForm] = useState({
@@ -72,8 +73,28 @@ export default function Settings() {
     language: 'zh-CN',
   });
 
-  const handleSave = () => {
-    toast.success('设置已保存', { description: '您的个人信息和偏好设置已更新' });
+  const handleSave = async () => {
+    try {
+      const res = await api.put<{ success: boolean; data: any }>(`/api/users/${user.id}`, {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        department: form.department,
+      });
+      if (res.success) {
+        // Update context so Navbar/Sidebar reflect changes
+        updateUserInfo({
+          name: form.name,
+          email: form.email,
+          department: form.department,
+        });
+        toast.success('设置已保存', { description: '个人信息已更新' });
+      } else {
+        toast.error('保存失败', { description: '请稍后重试' });
+      }
+    } catch (err: any) {
+      toast.error('保存失败', { description: err?.message || '网络错误' });
+    }
   };
 
   return (

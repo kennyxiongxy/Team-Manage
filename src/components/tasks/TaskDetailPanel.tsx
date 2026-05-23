@@ -16,8 +16,6 @@ import {
   Send,
 } from 'lucide-react';
 import {
-  mockTeamMembers,
-  mockProjects,
   priorityConfig,
   statusConfig,
 } from '@/data/mockData';
@@ -31,13 +29,9 @@ interface TaskDetailPanelProps {
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(memberId: string) {
-  return mockTeamMembers.find((m) => m.id === memberId);
-}
+function getMember(task: any) { if (task.assignee && task.assignee !== "未分配") return { name: task.assignee, avatar: "" }; return null; }
 
-function getProject(projectId: string) {
-  return mockProjects.find((p) => p.id === projectId);
-}
+function getProject(task: any) { if (task.project && task.project !== "未分配") return { name: task.project, color: "#3B82F6" }; return null; }
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -94,7 +88,7 @@ export default function TaskDetailPanel({
     onUpdate(task.id, {
       subTasks: updatedSubTasks,
       progress: newProgress,
-      status: allDone ? '待审核' : task.status === '已完成' ? '进行中' : task.status,
+      status: allDone ? 'pending-review' : task.status === 'completed' ? 'in-progress' : task.status,
     });
   };
 
@@ -233,7 +227,7 @@ export default function TaskDetailPanel({
                   className="text-sm font-medium"
                   style={{
                     color:
-                      new Date(task.dueDate) < new Date() && task.status !== '已完成'
+                      new Date(task.dueDate) < new Date() && task.status !== 'completed'
                         ? '#EF4444'
                         : '#F8FAFC',
                   }}
@@ -368,15 +362,15 @@ export default function TaskDetailPanel({
                     </div>
                     <div className="text-xs text-muted-foreground">
                       <span className="text-foreground">风险等级：</span>
-                      {task.priority === 'P0'
+                      {task.priority === 'urgent' || task.priority === 'high'
                         ? '高风险 - 建议每日跟进'
-                        : task.priority === 'P1'
+                        : task.priority === 'medium'
                           ? '中风险 - 建议每周检查'
                           : '低风险 - 正常推进'}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       <span className="text-foreground">AI 建议：</span>
-                      {task.progress < 30 && task.status === '进行中'
+                      {task.progress < 30 && task.status === 'in-progress'
                         ? '进度较慢，建议检查阻塞原因'
                         : task.progress > 80
                           ? '即将完成，准备验收工作'

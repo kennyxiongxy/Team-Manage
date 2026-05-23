@@ -13,7 +13,7 @@ const managerNavLinks = [
   { to: '/reports', label: '报告' },
   { to: '/team-analysis', label: '分析' },
   { to: '/ai-assistant', label: 'AI 助手' },
-  { to: '/feishu', label: '飞书集成' },
+  { to: '/feishu', label: '工作软件集成' },
 ];
 
 const employeeNavLinks = [

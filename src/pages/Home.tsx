@@ -253,13 +253,13 @@ function HelpRequestAlert() {
 }
 
 // ─── KPI 指标行 ───
-function KpiRow() {
+function KpiRow({ refreshKey }: { refreshKey: number }) {
   const [dashboardData, setDashboardData] = useState<any>(null);
   useEffect(() => {
     getDashboardOverview().then((res: any) => {
       if (res.success) setDashboardData(res.data);
     }).catch(() => {});
-  }, []);
+  }, [refreshKey]);
 
   const stats = dashboardData?.stats || {};
   const completed = dashboardData?.taskStatusStats?.find((s: any) => s.status === 'completed')?.count || 0;
@@ -410,14 +410,14 @@ function QuickActionsBar() {
 }
 
 // ─── 今日任务 ───
-function TodayTasksPanel() {
+function TodayTasksPanel({ onRefresh, refreshKey }: { onRefresh: () => void; refreshKey: number }) {
   const navigate = useNavigate();
   const [realTasks, setRealTasks] = useState<any[]>([]);
   useEffect(() => {
     getTasks().then((res: any) => {
       if (res.success) setRealTasks(res.data || []);
     }).catch(() => {});
-  }, []);
+  }, [refreshKey]);
   const displayTasks = realTasks.length > 0 
     ? realTasks.filter((t: any) => t.status === 'in-progress').slice(0, 4)
     : [];
@@ -449,12 +449,13 @@ function TodayTasksPanel() {
         <div className="space-y-3">
           {displayTasks.map((task: any, i: number) => (
             <TaskCard key={task.id} task={{
-              id: task.id, title: task.title, description: task.description,
-              priority: task.priority, status: task.status === 'in-progress' ? '进行中' : task.status === 'completed' ? '已完成' : '待开始',
+              id: task.id, title: task.title, description: task.description || '',
+              priority: task.priority, status: task.status,
               progress: task.progress || 0, assignee: task.assignee_name || '未分配',
-              dueDate: task.due_date, projectName: task.project_name || task.project || '',
+              dueDate: task.due_date, project: task.project_name || '',
               tags: []
-            }} index={i} onClick={() => navigate('/tasks')} />
+            }} index={i} onClick={() => navigate('/tasks')}
+              onTaskUpdated={onRefresh} />
           ))}
         </div>
       )}
@@ -463,7 +464,7 @@ function TodayTasksPanel() {
 }
 
 // ─── 项目进度 ───
-function ProjectProgressCard() {
+function ProjectProgressCard({ refreshKey }: { refreshKey: number }) {
   const [projects, setProjects] = useState<any[]>([]);
   useEffect(() => {
     getProjects().then((res: any) => {
@@ -477,7 +478,7 @@ function ProjectProgressCard() {
         setProjects(mapped);
       }
     }).catch(() => {});
-  }, []);
+  }, [refreshKey]);
 
   const healthLabels: Record<string, { label: string; color: string }> = {
     good: { label: '健康', color: '#22C55E' },
@@ -529,7 +530,7 @@ function ProjectProgressCard() {
 }
 
 // ─── 团队状态 ───
-function TeamStatusCard() {
+function TeamStatusCard({ refreshKey }: { refreshKey: number }) {
   const navigate = useNavigate();
   const [members, setMembers] = useState<any[]>([]);
   useEffect(() => {
@@ -547,7 +548,7 @@ function TeamStatusCard() {
         }
       }).catch(() => {});
     });
-  }, []);
+  }, [refreshKey]);
 
   const statusColors: Record<string, string> = {
     online: '#22C55E',
@@ -766,6 +767,9 @@ function WeeklyPreviewCard() {
 
 /* ─── ManagerDashboard ─── */
 function ManagerDashboard() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refreshDashboard = () => setRefreshKey(k => k + 1);
+
   const [apiStatus, setApiStatus] = useState<string | null>(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -818,7 +822,7 @@ function ManagerDashboard() {
       <AiBriefBanner />
 
       {/* KPI 指标行 */}
-      <KpiRow />
+      <KpiRow refreshKey={refreshKey} />
 
       {/* 快捷操作栏 */}
       <motion.div
@@ -837,16 +841,16 @@ function ManagerDashboard() {
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         {/* 左栏 */}
         <div className="flex-1 min-w-0 space-y-8">
-          <TodayTasksPanel />
+          <TodayTasksPanel onRefresh={refreshDashboard} refreshKey={refreshKey} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <ProjectProgressCard />
+            <ProjectProgressCard refreshKey={refreshKey} />
             <WeeklyPreviewCard />
           </div>
         </div>
 
         {/* 右栏 — 侧边信息 */}
         <div className="w-full lg:w-[340px] xl:w-[380px] flex-shrink-0 space-y-8">
-          <TeamStatusCard />
+          <TeamStatusCard refreshKey={refreshKey} />
           <ActivityFeedCard />
         </div>
       </div>
