@@ -3,6 +3,7 @@ import { body, param, validationResult } from 'express-validator';
 import { queryAll, queryOne, run } from '../utils/db';
 import { authMiddleware, AuthRequest, requireManager } from '../middleware/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { syncProjectToFeishu } from '../utils/feishuSync';
 
 const router = Router();
 
@@ -84,6 +85,7 @@ router.post(
 
       const project = queryOne('SELECT * FROM projects WHERE id = ?', [id]);
       res.json({ success: true, data: project });
+      syncProjectToFeishu(id).catch(e => console.warn('[projects] 飞书同步失败:', e.message));
     } catch (error) {
       res.status(500).json({ success: false, message: '创建项目失败' });
     }
@@ -125,6 +127,7 @@ router.put(
 
       const project = queryOne('SELECT * FROM projects WHERE id = ?', [req.params.id]);
       res.json({ success: true, data: project });
+      syncProjectToFeishu(req.params.id).catch(e => console.warn('[projects] 飞书同步失败:', e.message));
     } catch (error) {
       res.status(500).json({ success: false, message: '更新项目失败' });
     }

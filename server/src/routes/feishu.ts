@@ -5,6 +5,7 @@ import { authMiddleware, requireManager } from '../middleware/auth';
 import { getFeishuUsers, searchFeishuBases, getBaseTables, getTableFields, getTableRecords, createDefaultTaskBase } from '../utils/larkCli';
 
 import { autoScanAndMap } from '../utils/dynamicFieldMapper';
+import { syncTaskToFeishu, syncProjectToFeishu, syncAllToFeishu } from '../utils/feishuSync';
 import { getMappedRecords } from '../utils/dynamicFieldMapper';
 const router = Router();
 
@@ -137,6 +138,26 @@ router.post('/create-default-tables', authMiddleware, requireManager, async (_re
   } catch (error: any) {
     res.status(500).json({ success: false, message: '创建标准表格失败: ' + (error.message || '') });
   }
+});
+
+// ─── 🔄 同步到飞书 ───
+router.post('/sync-task', authMiddleware, requireManager, async (req: Request, res: Response) => {
+  const { taskId } = req.body;
+  if (!taskId) { res.status(400).json({ success: false, message: '请提供taskId' }); return; }
+  const result = await syncTaskToFeishu(taskId);
+  res.json(result);
+});
+
+router.post('/sync-project', authMiddleware, requireManager, async (req: Request, res: Response) => {
+  const { projectId } = req.body;
+  if (!projectId) { res.status(400).json({ success: false, message: '请提供projectId' }); return; }
+  const result = await syncProjectToFeishu(projectId);
+  res.json(result);
+});
+
+router.post('/sync-all', authMiddleware, requireManager, async (_req: Request, res: Response) => {
+  const result = await syncAllToFeishu();
+  res.json({ success: true, data: result });
 });
 
 export default router;

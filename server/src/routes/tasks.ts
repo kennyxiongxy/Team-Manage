@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { queryAll, queryOne, run } from '../utils/db';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { syncTaskToFeishu } from '../utils/feishuSync';
 import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
@@ -135,6 +136,8 @@ router.post(
       );
 
       res.json({ success: true, data: task });
+      // 异步同步到飞书
+      syncTaskToFeishu(id).catch(e => console.warn('[tasks] 飞书同步失败:', e.message));
     } catch (error) {
       console.error('Create task error:', error);
       res.status(500).json({ success: false, message: '创建任务失败' });
@@ -209,6 +212,8 @@ router.put(
       }
 
       res.json({ success: true, data: task });
+      // 异步同步到飞书
+      syncTaskToFeishu(req.params.id).catch(e => console.warn('[tasks] 飞书同步失败:', e.message));
     } catch (error) {
       res.status(500).json({ success: false, message: '更新任务失败' });
     }
@@ -228,6 +233,8 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
       return;
     }
     run('DELETE FROM tasks WHERE id = ?', [req.params.id]);
+    // 标记飞书同步状态为待删除
+    run("UPDATE feishu_sync_map SET sync_status = 'deleted' WHERE entity_type = 'tasks' AND local_id = ?", [req.params.id]);
     res.json({ success: true, message: '删除成功' });
   } catch (error) {
     res.status(500).json({ success: false, message: '删除任务失败' });

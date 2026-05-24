@@ -187,6 +187,18 @@ async function runMigrations() {
       source_session_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS feishu_sync_map (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      local_id TEXT NOT NULL,
+      feishu_record_id TEXT,
+      feishu_base_token TEXT,
+      feishu_table_id TEXT,
+      last_synced_at TEXT,
+      sync_status TEXT DEFAULT 'pending',
+      UNIQUE(entity_type, local_id)
     )
   `);
   console.log('Migrations completed.');
