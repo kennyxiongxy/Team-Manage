@@ -17,6 +17,7 @@ function mapBackendTask(t: any): Task {
     project: t.project_name || '未分配',
     projectId: t.project_id || '',
     assigneeId: t.assignee_id || '',
+    createdAt: t.created_at || '',
     aiRecommended: false,
     subTasks: [],
     comments: [],

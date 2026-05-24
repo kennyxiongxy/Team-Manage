@@ -241,18 +241,18 @@ export default function TaskDetailPanel({
                   className="text-sm font-medium"
                   style={{
                     color:
-                      new Date(task.dueDate) < new Date() && task.status !== 'completed'
+                      task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
                         ? '#EF4444'
                         : '#F8FAFC',
                   }}
                 >
-                  {formatDate(task.dueDate)}
+                  {task.dueDate ? formatDate(task.dueDate) : '未设置'}
                 </div>
                 <input
                   id="due-date-picker"
                   type="date"
                   className="absolute inset-0 opacity-0 cursor-pointer"
-                  value={task.dueDate}
+                  value={task.dueDate || ''}
                   onChange={(e) => {
                     const newDate = e.target.value;
                     if (newDate) {
@@ -268,7 +268,7 @@ export default function TaskDetailPanel({
                   创建日期
                 </div>
                 <div className="text-sm font-medium text-foreground">
-                  {formatDate(task.startDate ?? task.completedDate ?? task.dueDate)}
+                  {formatDate(task.createdAt || task.startDate || task.dueDate)}
                 </div>
               </div>
             </div>
