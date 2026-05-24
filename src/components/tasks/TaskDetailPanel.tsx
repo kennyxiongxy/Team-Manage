@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -69,6 +69,29 @@ export default function TaskDetailPanel({
   const [commentsExpanded, setCommentsExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [aiInsight, setAiInsight] = useState<{ estimatedCompletion: string; riskLevel: string; suggestion: string } | null>(null);
+  const [aiInsightLoading, setAiInsightLoading] = useState(false);
+
+  // 获取AI洞察
+  useEffect(() => {
+    if (!task?.id) return;
+    let cancelled = false;
+    setAiInsightLoading(true);
+    setAiInsight(null);
+    const token = localStorage.getItem('token');
+    fetch('/api/ai/task-insight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ taskId: task.id }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.success) setAiInsight(data.data);
+      })
+      .catch(e => console.warn('AI insight fetch failed:', e))
+      .finally(() => { if (!cancelled) setAiInsightLoading(false); });
+    return () => { cancelled = true; };
+  }, [task?.id]);
 
   if (!task) return null;
 
@@ -368,43 +391,29 @@ export default function TaskDetailPanel({
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">预计完成：</span>
-                      {(() => {
-                        const remaining = 100 - task.progress;
-                        const daysPerPercent = task.progress > 0
-                          ? (new Date().getTime() - new Date(task.startDate || task.dueDate).getTime()) / (1000*60*60*24) / task.progress
-                          : 1;
-                        const estDays = Math.ceil(remaining * daysPerPercent);
-                        const estDate = new Date();
-                        estDate.setDate(estDate.getDate() + estDays);
-                        const estStr = `${estDate.getFullYear()}-${String(estDate.getMonth()+1).padStart(2,'0')}-${String(estDate.getDate()).padStart(2,'0')}`;
-                        const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed';
-                        if (isOverdue) {
-                          return <><span className="text-destructive">已逾期</span>（原截止 {formatDate(task.dueDate)}）</>;
-                        }
-                        if (estStr > task.dueDate) {
-                          return <><span className="text-yellow-400">预计 {formatDate(estStr)}</span>（可能延期，原截止 {formatDate(task.dueDate)}）</>;
-                        }
-                        return <span>按当前进度，预计 {formatDate(task.dueDate)} 完成（{task.progress}% 进度正常）</span>;
-                      })()}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">风险等级：</span>
-                      {task.priority === 'urgent' || task.priority === 'high'
-                        ? '高风险 - 建议每日跟进'
-                        : task.priority === 'medium'
-                          ? '中风险 - 建议每周检查'
-                          : '低风险 - 正常推进'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">AI 建议：</span>
-                      {task.progress < 30 && task.status === 'in-progress'
-                        ? '进度较慢，建议检查阻塞原因'
-                        : task.progress > 80
-                          ? '即将完成，准备验收工作'
-                          : '进度正常，继续保持'}
-                    </div>
+                    {aiInsightLoading ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <div className="w-3 h-3 border-2 border-[#A855F7] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-muted-foreground">AI 正在分析任务...</span>
+                      </div>
+                    ) : aiInsight ? (
+                      <>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">预计完成：</span>
+                          {aiInsight.estimatedCompletion}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">风险等级：</span>
+                          {aiInsight.riskLevel}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">AI 建议：</span>
+                          {aiInsight.suggestion}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground py-1">无法加载 AI 洞察</div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -295,4 +295,153 @@ function generateSmartResponse(message: string, context?: ChatRequest['context']
   return defaultReply;
 }
 
+// ─── POST /task-insight ─── 针对单个任务生成 AI 洞察
+router.post('/task-insight', authMiddleware, async (req: AuthRequest, res: Response) => {
+  const { taskId } = req.body;
+  if (!taskId) {
+    res.status(400).json({ success: false, message: '请提供任务ID' });
+    return;
+  }
+
+  try {
+    const { queryOne } = await import('../utils/db');
+    const task = queryOne(
+      `SELECT t.*, u.name as assignee_name, p.name as project_name
+       FROM tasks t
+       LEFT JOIN users u ON t.assignee_id = u.id
+       LEFT JOIN projects p ON t.project_id = p.id
+       WHERE t.id = ?`,
+      [taskId]
+    );
+
+    if (!task) {
+      res.status(404).json({ success: false, message: '任务不存在' });
+      return;
+    }
+
+    const taskSummary = `
+任务：${task.title}
+描述：${task.description || '无'}
+优先级：${task.priority}
+状态：${task.status}
+进度：${task.progress}%
+负责人：${task.assignee_name || '未分配'}
+所属项目：${task.project_name || '无'}
+截止日期：${task.due_date || '未设置'}
+开始日期：${task.start_date || '未设置'}
+创建时间：${task.created_at || '未知'}
+`;
+
+    const prompt = `你是一个资深团队管理者。请根据以下任务信息给出3条简短的AI洞察：
+
+${taskSummary}
+
+要求：
+1. 第一条：评估该任务的完成预期（基于进度和截止日期判断是否能按时完成）
+2. 第二条：评估风险等级（综合考虑优先级、进度、是否有负责人）
+3. 第三条：给出具体可执行的建议
+
+每条不超过40字，用JSON格式返回：{"estimatedCompletion": "...", "riskLevel": "...", "suggestion": "..."}`;
+
+    const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        messages: [
+          { role: 'system', content: '你是团队管理AI助手。只返回纯JSON，不要markdown代码块。' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.5,
+        max_tokens: 300,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('AI task insight error:', response.status, errText);
+      // 降级：使用规则引擎
+      const fallback = generateTaskInsightFallback(task);
+      res.json({ success: true, data: fallback, source: 'rule-engine' });
+      return;
+    }
+
+    const aiData = await response.json();
+    const rawContent = aiData.choices?.[0]?.message?.content || '';
+    
+    // 尝试解析JSON，失败则降级
+    try {
+      const parsed = JSON.parse(rawContent);
+      res.json({ success: true, data: parsed, source: 'ai' });
+    } catch {
+      const fallback = generateTaskInsightFallback(task);
+      res.json({ success: true, data: fallback, source: 'rule-engine' });
+    }
+  } catch (error: any) {
+    console.error('Task insight error:', error);
+    // 降级
+    try {
+      const { queryOne } = await import('../utils/db');
+      const task = queryOne('SELECT * FROM tasks WHERE id = ?', [req.body.taskId]);
+      if (task) {
+        const fallback = generateTaskInsightFallback(task);
+        res.json({ success: true, data: fallback, source: 'rule-engine' });
+        return;
+      }
+    } catch {}
+    res.status(500).json({ success: false, message: 'AI洞察生成失败' });
+  }
+});
+
+// 规则引擎降级函数
+function generateTaskInsightFallback(task: any) {
+  const progress = task.progress || 0;
+  const priority = task.priority;
+  const status = task.status;
+  const hasAssignee = !!task.assignee_name;
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
+  const now = new Date();
+  const isOverdue = dueDate && dueDate < now && status !== 'completed';
+  const daysLeft = dueDate ? Math.ceil((dueDate.getTime() - now.getTime()) / 86400000) : null;
+
+  // 预计完成
+  let estimatedCompletion = '';
+  if (isOverdue) {
+    estimatedCompletion = `⚠️ 已逾期${Math.abs(daysLeft || 0)}天，建议立即评估剩余工作量`;
+  } else if (progress >= 80) {
+    estimatedCompletion = `✅ 接近完成（${progress}%），预计可按时交付`;
+  } else if (progress === 0 && status === 'not-started') {
+    estimatedCompletion = '⏳ 尚未启动，需确认启动时间和前置条件';
+  } else if (daysLeft && daysLeft < 3 && progress < 50) {
+    estimatedCompletion = `⚠️ 仅剩${daysLeft}天但进度仅${progress}%，有延期风险`;
+  } else if (daysLeft) {
+    estimatedCompletion = `剩余${daysLeft}天，进度${progress}%，按当前节奏${progress > 0 ? '基本可控' : '需加速推进'}`;
+  } else {
+    estimatedCompletion = `进度${progress}%，未设置截止日期，建议尽快明确`;
+  }
+
+  // 风险等级
+  let riskLevel = '';
+  if (isOverdue && priority === 'urgent') riskLevel = '🔴 严重风险 - 逾期且高优，需立即升级处理';
+  else if (isOverdue) riskLevel = '🔴 高风险 - 已逾期，需本周内闭环';
+  else if (priority === 'urgent' && progress < 50) riskLevel = '🟠 高风险 - 紧急任务进度落后';
+  else if (!hasAssignee) riskLevel = '🟡 中风险 - 缺少负责人，可能无人跟进';
+  else if (daysLeft && daysLeft < 3) riskLevel = '🟡 中风险 - 临近截止日期';
+  else if (priority === 'high') riskLevel = '🟡 中风险 - 高优先级需持续关注';
+  else riskLevel = '🟢 低风险 - 正常推进中';
+
+  // 建议
+  let suggestion = '';
+  if (!hasAssignee) suggestion = '💡 指定一名负责人，明确交付标准';
+  else if (isOverdue) suggestion = '💡 与负责人1对1沟通，重新评估截止日期和资源需求';
+  else if (progress < 30 && daysLeft && daysLeft < 5) suggestion = '💡 拆分任务为小步里程碑，每日检查进展';
+  else if (progress > 80) suggestion = '💡 准备验收checklist，提前通知相关方';
+  else suggestion = '💡 确认当前无阻塞，保持节奏';
+
+  return { estimatedCompletion, riskLevel, suggestion };
+}
+
 export default router;
