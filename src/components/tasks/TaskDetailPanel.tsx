@@ -30,7 +30,12 @@ interface TaskDetailPanelProps {
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(task: any) { if (task.assignee && task.assignee !== "未分配") return { name: task.assignee, avatar: "" }; return null; }
+function getMember(task: any) { 
+  // task could be a string (assignee name) or an object with .assignee
+  const name = typeof task === 'string' ? task : (task?.assignee || task?.name || '');
+  if (name && name !== '未分配') return { name, avatar: task?.avatar_url || task?.assignee_avatar || '' };
+  return null;
+}
 
 function getProject(task: any) { if (task.project && task.project !== "未分配") return { name: task.project, color: "#3B82F6" }; return null; }
 
@@ -67,8 +72,8 @@ export default function TaskDetailPanel({
 
   if (!task) return null;
 
-  const assignee = getMember(task.assigneeId ?? '');
-  const project = getProject(task.projectId ?? '');
+  const assignee = task.assignee && task.assignee !== '未分配' ? { name: task.assignee, avatar: task.assigneeAvatar || '' } : null;
+  const project = task.project && task.project !== '未分配' ? { name: task.project, color: '#3B82F6' } : null;
   const priority = priorityConfig[task.priority];
   const status = statusConfig[task.status];
   const completedSubTasks = (task.subTasks ?? []).filter((st) => st.completed).length;
