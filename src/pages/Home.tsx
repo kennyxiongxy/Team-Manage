@@ -139,6 +139,7 @@ function HomeDataLoader({ children }: { children: React.ReactNode }) {
 // ─── 顶部问候区 ───
 function GreetingBanner() {
   const { user } = useUserRole();
+  const navigate = useNavigate();
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
@@ -172,14 +173,14 @@ function GreetingBanner() {
       </div>
       <div className="hidden sm:flex items-center gap-3">
         <button
-          onClick={() => toast.success('正在刷新数据...')}
+          onClick={() => window.location.reload()}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card border border-border text-sm text-muted-foreground hover:text-foreground hover:border-accent/30 transition-all"
         >
           <RefreshCw size={14} />
           刷新
         </button>
         <button
-          onClick={() => toast.success('打开 AI 助手')}
+          onClick={() => navigate('/ai-assistant')}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-accent/20 to-purple-500/20 border border-accent/30 text-sm text-accent font-medium hover:from-accent/30 hover:to-purple-500/30 transition-all"
         >
           <Sparkles size={14} />
