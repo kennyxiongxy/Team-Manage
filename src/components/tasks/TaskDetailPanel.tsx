@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
+  Play,
 } from 'lucide-react';
 import {
   priorityConfig,
@@ -281,8 +282,25 @@ export default function TaskDetailPanel({
               </div>
             </div>
 
-            {/* Progress */}
+            {/* 启动任务 / 进度 */}
             <div>
+              {task.status === 'not-started' && (
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    onUpdate(task.id, {
+                      status: 'in-progress',
+                      startDate: task.startDate || today,
+                      progress: 5,
+                    });
+                    toast.success('🚀 任务已启动', { description: '状态已更新为「进行中」' });
+                  }}
+                  className="w-full mb-3 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gradient-to-r from-[#06B6D4] to-[#22C55E] text-white text-sm font-medium hover:shadow-[0_0_16px_rgba(6,182,212,0.3)] transition-all"
+                >
+                  <Play className="w-4 h-4" />
+                  启动任务
+                </button>
+              )}
               <label className="text-xs font-medium text-muted-foreground mb-2 block">
                 进度 ({task.progress}%)
               </label>
