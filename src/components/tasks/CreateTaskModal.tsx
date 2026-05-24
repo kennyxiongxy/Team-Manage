@@ -26,6 +26,8 @@ interface CreateTaskModalProps {
     dueDate: string;
   }) => void;
   defaultStatus?: TaskStatus;
+  projects?: { id: string; name: string }[];
+  teamMembers?: { id: string; name: string; role: string }[];
 }
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -35,6 +37,8 @@ export default function CreateTaskModal({
   onClose,
   onCreate,
   defaultStatus = 'not-started',
+  projects = [],
+  teamMembers = [],
 }: CreateTaskModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -156,7 +160,7 @@ export default function CreateTaskModal({
                     onChange={(e) => setProjectId(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-card border border-border text-foreground text-sm focus:outline-none focus:border-accent transition-colors appearance-none"
                   >
-                    {mockProjects.map((p) => (
+                    {projects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
@@ -173,7 +177,7 @@ export default function CreateTaskModal({
                     onChange={(e) => setAssigneeId(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-lg bg-card border border-border text-foreground text-sm focus:outline-none focus:border-accent transition-colors appearance-none"
                   >
-                    {mockTeamMembers.map((m) => (
+                    {teamMembers.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name} ({m.role})
                       </option>

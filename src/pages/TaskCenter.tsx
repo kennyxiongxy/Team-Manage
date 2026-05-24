@@ -446,6 +446,8 @@ export default function TaskCenter() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onCreate={handleCreateTask}
+        projects={projects}
+        teamMembers={teamMembers.map((m: any) => ({ id: m.id, name: m.name, role: m.role }))}
       />
 
       {/* Task Detail Panel */}
