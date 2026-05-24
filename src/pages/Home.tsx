@@ -283,6 +283,59 @@ function KpiRow({ refreshKey }: { refreshKey: number }) {
 // ─── AI 晨报 ───
 function AiBriefBanner() {
   const [expanded, setExpanded] = useState(false);
+  const [briefData, setBriefData] = useState<any>(null);
+
+  useEffect(() => {
+    Promise.all([
+      getDashboardOverview(),
+      getTasks(),
+      getProjects(),
+      getUsers(),
+    ]).then(([dashRes, tasksRes, projRes, usersRes]) => {
+      const dashboard = dashRes?.data || {};
+      const tasks = tasksRes?.data || [];
+      const projects = projRes?.data || [];
+      const users = usersRes?.data || [];
+
+      const inProgress = tasks.filter((t: any) => t.status === 'in-progress').length;
+      const overdue = tasks.filter((t: any) => t.status === 'overdue').length;
+      const today = new Date().toISOString().split('T')[0];
+      const dueToday = tasks.filter((t: any) => t.due_date === today).length;
+      const completed = tasks.filter((t: any) => t.status === 'completed').length;
+      const total = tasks.length;
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      // 风险项目
+      const riskProjects = projects.filter((p: any) => p.status === 'at-risk' || (p.health_score && p.health_score < 70));
+      const riskText = riskProjects.length > 0
+        ? `${riskProjects.length} 个项目存在风险：${riskProjects.map((p: any) => p.name).join('、')}`
+        : '当前所有项目健康度良好，无异常风险';
+
+      // 亮点
+      let highlight = '团队数据正常，暂无特别亮点';
+      if (completionRate >= 80) highlight = `团队任务完成率达 ${completionRate}%，表现优异`;
+      else if (completed >= inProgress && inProgress > 0) highlight = `已完成任务(${completed})超过进行中(${inProgress})，节奏健康`;
+      else if (dueToday > 0 && overdue === 0) highlight = `${dueToday} 个任务今日截止，当前无逾期，节奏良好`;
+
+      // AI 建议
+      let suggestion = '建议持续关注团队任务进展';
+      if (overdue > 0) suggestion = `有 ${overdue} 项任务逾期，建议今天优先处理`;
+      else if (riskProjects.length > 0) suggestion = `有 ${riskProjects.length} 个项目存在风险，建议重点关注`;
+      else if (inProgress > users.length * 3) suggestion = `人均任务负载偏高（${inProgress}进行中 / ${users.length}人），建议评估优先级`;
+
+      setBriefData({
+        inProgress,
+        dueToday,
+        completionRate,
+        overdue,
+        riskText,
+        highlight,
+        suggestion,
+      });
+    }).catch(() => {});
+  }, []);
+
+  const d = briefData || { inProgress: '...', dueToday: '...', completionRate: '...', overdue: 0, riskText: '加载中...', highlight: '加载中...', suggestion: '加载中...' };
 
   return (
     <motion.div
@@ -306,12 +359,13 @@ function AiBriefBanner() {
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <h3 className="text-base font-bold text-foreground">AI 晨间简报</h3>
-                  <span className="px-2 py-0.5 rounded-full bg-accent/15 text-[10px] font-medium text-accent">每日更新</span>
+                  <span className="px-2 py-0.5 rounded-full bg-accent/15 text-[10px] font-medium text-accent">基于实时数据</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  今天团队有 <span className="text-accent font-semibold">8</span> 个任务进行中，
-                  <span className="text-yellow-400 font-semibold">2</span> 个今日截止，
-                  <span className="text-green-400 font-semibold">87%</span> 团队效率表现良好
+                  今天团队有 <span className="text-accent font-semibold">{d.inProgress}</span> 个任务进行中，
+                  <span className="text-yellow-400 font-semibold">{d.dueToday}</span> 个今日截止
+                  {d.overdue > 0 && <><span className="text-red-400 font-semibold">（{d.overdue} 个逾期）</span></>}，
+                  完成率 <span className="text-green-400 font-semibold">{d.completionRate}%</span>
                 </p>
               </div>
             </div>
@@ -341,7 +395,7 @@ function AiBriefBanner() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-foreground mb-1">风险提醒</p>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">项目「新官网」进度滞后，建议调整资源分配</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">{d.riskText}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.03]">
@@ -350,7 +404,7 @@ function AiBriefBanner() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-foreground mb-1">亮点</p>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">前端团队本周完成率提升 15%，表现优异</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">{d.highlight}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-white/[0.03]">
@@ -359,7 +413,7 @@ function AiBriefBanner() {
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-foreground mb-1">AI 建议</p>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">建议今日安排 30 分钟团队同步会议</p>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">{d.suggestion}</p>
                     </div>
                   </div>
                 </div>

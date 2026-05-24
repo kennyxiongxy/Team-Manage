@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronUp,
@@ -19,6 +20,7 @@ interface TaskListProps {
   onTaskClick: (task: Task) => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
+  onTaskEdit?: (task: Task) => void;
 }
 
 type SortKey = 'priority' | 'title' | 'assignee' | 'dueDate' | 'progress' | 'status';
@@ -41,6 +43,7 @@ export default function TaskList({
   onTaskClick,
   selectedIds,
   onSelectionChange,
+  onTaskEdit,
 }: TaskListProps) {
   const [sortKey, setSortKey] = useState<SortKey>('dueDate');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -296,24 +299,27 @@ export default function TaskList({
 
                     {/* Actions */}
                     <td className="px-3 py-3.5">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                         <button
-                          className="p-1 rounded hover:bg-muted transition-colors"
-                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded hover:bg-accent/10 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onTaskEdit?.(task); }}
+                          title="编辑任务"
                         >
-                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-accent" />
                         </button>
                         <button
-                          className="p-1 rounded hover:bg-muted transition-colors"
-                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded hover:bg-yellow-500/10 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); toast.info(`已向 ${task.assignee || '负责人'} 发送提醒`, { duration: 2000 }); }}
+                          title="发送提醒"
                         >
-                          <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Bell className="w-3.5 h-3.5 text-muted-foreground hover:text-yellow-400" />
                         </button>
                         <button
-                          className="p-1 rounded hover:bg-muted transition-colors"
-                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded hover:bg-muted transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onTaskClick(task); }}
+                          title="查看详情"
                         >
-                          <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+                          <MoreHorizontal className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
                         </button>
                       </div>
                     </td>

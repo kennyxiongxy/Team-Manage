@@ -122,13 +122,16 @@ function TeamMemoryPanel() {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); fetchFacts(); }}
-            className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); fetchFacts(); } }}
+            className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             title="刷新"
           >
             <RefreshCw className={cn('h-3 w-3', loading && 'animate-spin')} />
-          </button>
+          </span>
           <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
         </div>
       </button>
@@ -214,6 +217,7 @@ function DataLoader() {
 function RiskReportCard() {
   return (
     <motion.div
+      id="risk-report-section"
       initial={{ y: 30, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.4, delay: 0.15, ease }}
@@ -249,7 +253,10 @@ function RiskReportCard() {
         )}
       </div>
       <button
-        onClick={() => window.location.hash = '#/'}
+        onClick={() => {
+          const el = document.getElementById('risk-report-section');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }}
         className="mt-4 text-sm text-accent hover:underline flex items-center gap-1"
       >
         查看完整风险评估 →
@@ -394,40 +401,56 @@ function SuggestionsReportCard() {
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        onClick={async () => {
+        onClick={async (e: React.MouseEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
           const suggestions = managementSuggestions;
+          console.log('[AdoptAll] suggestions count:', suggestions?.length);
           if (!suggestions || suggestions.length === 0) {
             toast.info('暂无建议可采纳');
             return;
           }
           const highPriority = suggestions.filter((s: ManagementSuggestion) => s.priority === 'high');
+          console.log('[AdoptAll] highPriority count:', highPriority.length);
           if (highPriority.length === 0) {
             toast.info('没有高优先级建议需要采纳');
             return;
           }
           toast.info(`正在创建 ${highPriority.length} 条任务...`);
           try {
-            const results = await Promise.all(
-              highPriority.map((s: ManagementSuggestion) =>
-                api.post('/api/tasks', {
+            const results = await Promise.allSettled(
+              highPriority.map((s: ManagementSuggestion) => {
+                const today = new Date();
+                const dueDate = new Date(today);
+                dueDate.setDate(dueDate.getDate() + 7);
+                const formatDate = (d: Date) => d.toISOString().split('T')[0];
+                return api.post('/api/tasks', {
                   title: s.text.slice(0, 40),
                   description: s.text,
                   priority: 'high',
                   status: 'not-started',
-                })
-              )
+                  start_date: formatDate(today),
+                  due_date: formatDate(dueDate),
+                });
+              })
             );
-            const successCount = results.filter((r: any) => r.success).length;
-            toast.success(`已创建 ${successCount} 条高优先级任务`);
+            const successCount = results.filter((r: any) => r.status === 'fulfilled').length;
+            const failCount = results.filter((r: any) => r.status === 'rejected').length;
+            console.log('[AdoptAll] success:', successCount, 'fail:', failCount);
             if (successCount > 0) {
-              // Trigger dashboard refresh
+              toast.success(`已创建 ${successCount} 条高优先级任务`);
               window.dispatchEvent(new CustomEvent('task-created'));
+            } else if (failCount > 0) {
+              toast.error(`创建失败: ${results[0].status === 'rejected' ? (results[0] as any).reason?.message || '未知错误' : '请重试'}`);
             }
-          } catch (e) {
-            toast.error('创建任务失败，请重试');
+          } catch (e: any) {
+            console.error('[AdoptAll] error:', e);
+            toast.error('创建任务失败: ' + (e?.message || '请重试'));
           }
         }}
-        className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#A855F7] to-[#3B82F6] py-2.5 text-sm font-medium text-primary-foreground transition-shadow hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] relative z-10"
+        style={{ position: 'relative', zIndex: 20 }}
+        className="mt-5 w-full rounded-xl bg-gradient-to-r from-[#A855F7] to-[#3B82F6] py-2.5 text-sm font-medium text-primary-foreground transition-shadow hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] cursor-pointer"
+        data-testid="adopt-all-btn"
       >
         一键采纳全部建议
       </motion.button>

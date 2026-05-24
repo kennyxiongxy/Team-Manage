@@ -290,9 +290,9 @@ export default function EmployeeManagement() {
   });
 
   const overloadedCount = members.filter((m) => (m.workloadPercent || m.workload || 0) > 95).length;
-  const avgCompletion = Math.round(
+  const avgCompletion = members.length > 0 ? Math.round(
     members.reduce((sum, m) => sum + (m.completionRate || 0), 0) / members.length
-  );
+  ) : 0;
 
   return (
     <Layout>

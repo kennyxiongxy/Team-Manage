@@ -39,14 +39,18 @@ const KpiBlock = memo(function KpiBlock({
   const isPositive = trend > 0;
   const isNeutral = trend === 0;
 
-  const minSpark = Math.min(...sparkline);
-  const maxSpark = Math.max(...sparkline);
+  // Handle edge cases: empty or single-element sparkline to avoid NaN
+  const safeSparkline = sparkline && sparkline.length > 1 ? sparkline : sparkline && sparkline.length === 1 ? [sparkline[0], sparkline[0]] : [0, 0];
+  const len = safeSparkline.length;
+  const minSpark = Math.min(...safeSparkline);
+  const maxSpark = Math.max(...safeSparkline);
   const range = maxSpark - minSpark || 1;
-  const sparkPoints = sparkline.map((v, i) => {
-    const x = (i / (sparkline.length - 1)) * 60;
+  const sparkPoints = safeSparkline.map((v, i) => {
+    const x = (i / (len - 1)) * 60;
     const y = 20 - ((v - minSpark) / range) * 16;
+    if (isNaN(x) || isNaN(y)) return null;
     return `${x},${y}`;
-  }).join(' ');
+  }).filter(Boolean).join(' ');
 
   const TrendIcon = isNeutral ? Minus : isPositive ? TrendingUp : TrendingDown;
   const trendColor = isNeutral ? '#94A3B8' : color;

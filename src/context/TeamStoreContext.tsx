@@ -40,15 +40,17 @@ const TeamStoreContext = createContext<TeamStoreContextType | null>(null);
 export function TeamStoreProvider({ children }: { children: ReactNode }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetched, setFetched] = useState(false);
 
+  // token 轮询：等待登录后再加载数据
   useEffect(() => {
-    Promise.all([getUsers(), getTasks()])
-      .then(([usersRes, tasksRes]) => {
+    const fetchData = async () => {
+      try {
+        const [usersRes, tasksRes] = await Promise.all([getUsers(), getTasks()]);
         if (usersRes.success) {
           const users = usersRes.data;
           const tasks = tasksRes.success ? tasksRes.data : [];
           
-          // 计算每个用户的任务统计
           const taskCountByUser: Record<string, { total: number; completed: number; inProgress: number }> = {};
           for (const t of tasks) {
             if (!t.assignee_id) continue;
@@ -71,10 +73,39 @@ export function TeamStoreProvider({ children }: { children: ReactNode }) {
             };
           }));
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      } catch (err: any) {
+        console.warn('TeamStore 数据加载失败:', err?.message);
+        setLoading(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (fetched) return;
+
+    const token = localStorage.getItem('token');
+    if (token) {
+      setFetched(true);
+      fetchData();
+    } else {
+      // 每 500ms 轮询 token，最多 30 秒
+      let attempts = 0;
+      const maxAttempts = 60;
+      const interval = setInterval(() => {
+        const t = localStorage.getItem('token');
+        attempts++;
+        if (t) {
+          clearInterval(interval);
+          setFetched(true);
+          fetchData();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          setLoading(false);
+        }
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [fetched]);
 
   const addMembers = (newMembers: TeamMember[]) => {
     setMembers((prev) => {
@@ -89,7 +120,7 @@ export function TeamStoreProvider({ children }: { children: ReactNode }) {
       const existingIds = new Set(prev.map((m) => m.id));
       const newMembers: TeamMember[] = feishuUsers
         .filter((u) => !existingIds.has(u.openId))
-        .map((u, index) => ({
+        .map((u, _index) => ({
           id: u.openId,
           name: u.name,
           avatar: '',

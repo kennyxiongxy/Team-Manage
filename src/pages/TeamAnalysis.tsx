@@ -58,7 +58,17 @@ function KpiBlock({ kpi, index }: { kpi: typeof kpiData[0]; index: number }) {
               fill="none"
               stroke={isGood ? '#22C55E' : '#EF4444'}
               strokeWidth="2"
-              points={kpi.sparkline.map((v, i) => `${i * 10},${24 - ((v - Math.min(...kpi.sparkline)) / (Math.max(...kpi.sparkline) - Math.min(...kpi.sparkline))) * 20}`).join(' ')}
+              points={(kpi.sparkline && kpi.sparkline.length > 1 
+                ? kpi.sparkline 
+                : [0, 0]
+              ).map((v: number, i: number, arr: number[]) => {
+                const min = Math.min(...arr);
+                const max = Math.max(...arr);
+                const range = max - min || 1;
+                const x = i * 10;
+                const y = 24 - ((v - min) / range) * 20;
+                return isNaN(x) || isNaN(y) ? null : `${x},${y}`;
+              }).filter(Boolean).join(' ')}
             />
           </svg>
         </div>

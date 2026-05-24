@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -218,10 +219,18 @@ export default function TaskDetailPanel({
 
             {/* Time Info */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-card">
+              <div
+                className="p-3 rounded-lg bg-card cursor-pointer hover:bg-card/80 transition-colors group relative"
+                onClick={() => {
+                  const input = document.getElementById('due-date-picker') as HTMLInputElement;
+                  input?.showPicker?.();
+                  input?.click();
+                }}
+              >
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Calendar className="w-3.5 h-3.5" />
                   截止日期
+                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-accent ml-auto transition-opacity">点击修改</span>
                 </div>
                 <div
                   className="text-sm font-medium"
@@ -234,6 +243,19 @@ export default function TaskDetailPanel({
                 >
                   {formatDate(task.dueDate)}
                 </div>
+                <input
+                  id="due-date-picker"
+                  type="date"
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  value={task.dueDate}
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    if (newDate) {
+                      onUpdate(task.id, { dueDate: newDate });
+                      toast.success('截止日期已更新为 ' + newDate);
+                    }
+                  }}
+                />
               </div>
               <div className="p-3 rounded-lg bg-card">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
@@ -241,7 +263,7 @@ export default function TaskDetailPanel({
                   创建日期
                 </div>
                 <div className="text-sm font-medium text-foreground">
-                  {formatDate(task.startDate ?? task.dueDate)}
+                  {formatDate(task.startDate ?? task.completedDate ?? task.dueDate)}
                 </div>
               </div>
             </div>
@@ -358,7 +380,24 @@ export default function TaskDetailPanel({
                   >
                     <div className="text-xs text-muted-foreground">
                       <span className="text-foreground">预计完成：</span>
-                      按当前进度，预计 {formatDate(task.dueDate)} 完成
+                      {(() => {
+                        const remaining = 100 - task.progress;
+                        const daysPerPercent = task.progress > 0
+                          ? (new Date().getTime() - new Date(task.startDate || task.dueDate).getTime()) / (1000*60*60*24) / task.progress
+                          : 1;
+                        const estDays = Math.ceil(remaining * daysPerPercent);
+                        const estDate = new Date();
+                        estDate.setDate(estDate.getDate() + estDays);
+                        const estStr = `${estDate.getFullYear()}-${String(estDate.getMonth()+1).padStart(2,'0')}-${String(estDate.getDate()).padStart(2,'0')}`;
+                        const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed';
+                        if (isOverdue) {
+                          return <><span className="text-destructive">已逾期</span>（原截止 {formatDate(task.dueDate)}）</>;
+                        }
+                        if (estStr > task.dueDate) {
+                          return <><span className="text-yellow-400">预计 {formatDate(estStr)}</span>（可能延期，原截止 {formatDate(task.dueDate)}）</>;
+                        }
+                        return <span>按当前进度，预计 {formatDate(task.dueDate)} 完成（{task.progress}% 进度正常）</span>;
+                      })()}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       <span className="text-foreground">风险等级：</span>
