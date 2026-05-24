@@ -42,6 +42,37 @@ function getMember(task: any) {
 
 function getProject(task: any) { if (task.project && task.project !== "未分配") return { name: task.project, color: "#3B82F6" }; return null; }
 
+function UserAvatar({ name, src, size = 28 }: { name?: string; src?: string; size?: number }) {
+  const initial = (name || '?')[0].toUpperCase();
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name || ''}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+        }}
+      />
+    );
+  }
+  const colors = ['#3B82F6', '#22C55E', '#F97316', '#A855F7', '#06B6D4', '#EF4444', '#EC4899'];
+  const color = colors[(name || '?').charCodeAt(0) % colors.length];
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: '50%',
+        backgroundColor: color + '20', color: color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.4, fontWeight: 700, flexShrink: 0,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
+
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('zh-CN', {
@@ -220,11 +251,7 @@ export default function TaskDetailPanel({
               <div className="flex items-center gap-3">
                 {assignee && (
                   <>
-                    <img
-                      src={assignee.avatar}
-                      alt={assignee.name}
-                      className="w-8 h-8 rounded-full"
-                    />
+                    <UserAvatar name={assignee.name} src={assignee.avatar} size={28} />
                     <div>
                       <div className="text-sm text-foreground">{assignee.name}</div>
                       <div className="text-xs text-muted-foreground">{assignee.role}</div>
@@ -236,13 +263,7 @@ export default function TaskDetailPanel({
                     {(task.collaboratorIds ?? []).slice(0, 3).map((cid) => {
                       const m = getMember(cid);
                       return m ? (
-                        <img
-                          key={cid}
-                          src={m.avatar}
-                          alt={m.name}
-                          className="w-6 h-6 rounded-full border-2 border-[#1E293B]"
-                          title={m.name}
-                        />
+                        <UserAvatar name={m.name} src={m.avatar} size={24} />
                       ) : null;
                     })}
                   </div>
@@ -416,11 +437,7 @@ export default function TaskDetailPanel({
                           {st.title}
                         </span>
                         {st.assigneeId && (
-                          <img
-                            src={getMember(st.assigneeId)?.avatar}
-                            alt=""
-                            className="w-5 h-5 rounded-full"
-                          />
+                          <UserAvatar name={getMember(st.assigneeId)?.name} src={getMember(st.assigneeId)?.avatar} size={20} />
                         )}
                       </div>
                     ))}
@@ -511,11 +528,8 @@ export default function TaskDetailPanel({
                       const author = getMember(comment.authorId ?? comment.author ?? '');
                       return (
                         <div key={comment.id} className="flex gap-3">
-                          <img
-                            src={author?.avatar}
-                            alt={author?.name}
-                            className="w-7 h-7 rounded-full shrink-0 self-start"
-                          />
+<UserAvatar name={author?.name} src={author?.avatar} size={28} />
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-sm font-medium text-foreground">

@@ -235,11 +235,15 @@ export default function TaskList({
                     <td className="px-3 py-3.5">
                       {member && (
                         <div className="flex items-center gap-2">
-                          <img
-                            src={member.avatar}
-                            alt={member.name}
-                            className="w-6 h-6 rounded-full"
-                          />
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                            style={{
+                              backgroundColor: '#3B82F6' + '20',
+                              color: '#3B82F6',
+                            }}
+                          >
+                            {member.name?.[0] || '?'}
+                          </div>
                           <span className="text-sm text-foreground">{member.name}</span>
                         </div>
                       )}
