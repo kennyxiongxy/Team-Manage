@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Send,
   Play,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import {
   priorityConfig,
@@ -70,6 +72,8 @@ export default function TaskDetailPanel({
   const [commentsExpanded, setCommentsExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
   const [aiInsight, setAiInsight] = useState<{ estimatedCompletion: string; riskLevel: string; suggestion: string } | null>(null);
   const [aiInsightLoading, setAiInsightLoading] = useState(false);
 
@@ -319,16 +323,59 @@ export default function TaskDetailPanel({
             </div>
 
             {/* Description */}
-            {task.description && (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground">
                   描述
                 </label>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {task.description}
-                </p>
+                {!editingDescription && (
+                  <button
+                    onClick={() => {
+                      setDescDraft(task.description || '');
+                      setEditingDescription(true);
+                    }}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    编辑
+                  </button>
+                )}
               </div>
-            )}
+              {editingDescription ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={descDraft}
+                    onChange={(e) => setDescDraft(e.target.value)}
+                    placeholder="输入任务描述..."
+                    className="w-full min-h-[80px] px-3 py-2 rounded-lg bg-card border border-border text-sm text-foreground placeholder-[#64748B] focus:outline-none focus:border-accent resize-y"
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setEditingDescription(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={() => {
+                        onUpdate(task.id, { description: descDraft });
+                        setEditingDescription(false);
+                        toast.success('描述已更新');
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+                    >
+                      <Check className="w-3 h-3" />
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground leading-relaxed">
+                  {task.description || '暂无描述，点击「编辑」添加'}
+                </p>
+              )}
+            </div>
 
             {/* Sub Tasks */}
             <div>
