@@ -224,29 +224,19 @@ export default function TaskDetailPanel({
 
             {/* Time Info */}
             <div className="grid grid-cols-2 gap-3">
-              <div
-                className="p-3 rounded-lg bg-card cursor-pointer hover:bg-card/80 transition-colors group relative"
-              >
+              <div className="p-3 rounded-lg bg-card group">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Calendar className="w-3.5 h-3.5" />
                   截止日期
-                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-accent ml-auto transition-opacity">点击修改</span>
-                </div>
-                <div
-                  className="text-sm font-medium"
-                  style={{
-                    color:
-                      task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
-                        ? '#EF4444'
-                        : '#F8FAFC',
-                  }}
-                >
-                  {task.dueDate ? formatDate(task.dueDate) : '未设置'}
                 </div>
                 <input
                   id="due-date-picker"
                   type="date"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  className="w-full bg-transparent text-sm font-medium text-foreground border-none outline-none cursor-pointer focus:ring-1 focus:ring-accent rounded p-0"
+                  style={{
+                    color: task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
+                      ? '#EF4444' : '#F8FAFC',
+                  }}
                   value={task.dueDate || ''}
                   onChange={(e) => {
                     const newDate = e.target.value;
