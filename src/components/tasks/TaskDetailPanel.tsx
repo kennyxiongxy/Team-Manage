@@ -226,11 +226,6 @@ export default function TaskDetailPanel({
             <div className="grid grid-cols-2 gap-3">
               <div
                 className="p-3 rounded-lg bg-card cursor-pointer hover:bg-card/80 transition-colors group relative"
-                onClick={() => {
-                  const input = document.getElementById('due-date-picker') as HTMLInputElement;
-                  input?.showPicker?.();
-                  input?.click();
-                }}
               >
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Calendar className="w-3.5 h-3.5" />
