@@ -941,13 +941,7 @@ function ManagerDashboard() {
 function EmployeeDashboard() {
   const { user } = useUserRole();
   const [myTasks, setMyTasks] = useState<any[]>([]);
-  const now = new Date();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
-  const dateStr = now.toLocaleDateString('zh-CN', {
-    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
-  });
-  const today = now.toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     getTasks().then((res: any) => {
@@ -967,30 +961,15 @@ function EmployeeDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* 问候信息 + AI提醒 并列 */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: easeOut }}
-      >
-        <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* 左侧：问候 + 今日摘要 */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-foreground">
-              {greeting}，{user.name} 👋
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
-              <Calendar size={13} className="text-muted-foreground/60" />
-              {now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })} · 本周第 {Math.ceil((now.getDate() - now.getDay() + 1) / 7) || 1} 个工作日
-            </p>
-
-          </div>
-          {/* 右侧：AI提醒 */}
-          <div className="lg:w-[300px] shrink-0">
-            <AiPersonalReminders />
-          </div>
+      {/* EmployeeHeader + AI提醒 并列 */}
+      <div className="flex flex-col lg:flex-row gap-5 items-start">
+        <div className="flex-1 min-w-0">
+          <EmployeeHeader />
         </div>
-      </motion.div>
+        <div className="lg:w-[300px] shrink-0">
+          <AiPersonalReminders />
+        </div>
+      </div>
 
       {/* 个人 KPI */}
       <motion.div
@@ -1026,7 +1005,7 @@ function EmployeeDashboard() {
         </div>
       </motion.div>
 
-      <EmployeeHeader />
+
       <PriorityHighlight />
 
       <div className="flex flex-col gap-8 lg:flex-row">
