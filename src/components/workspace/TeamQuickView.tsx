@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2,
@@ -8,8 +9,7 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { wsTeamMembers, teamActivities } from '@/data/mockData';
-import type { TeamMember } from '@/data/mockData';
+import { getUsers, getTasks } from '@/api/client';
 
 const statusConfig: Record<string, { color: string; label: string }> = {
   busy: { color: '#EF4444', label: '忙碌' },
@@ -64,7 +64,7 @@ export default function TeamQuickView() {
 
         <div className="rounded-xl bg-muted p-4">
           <div className="space-y-3">
-            {teamActivities.map((activity, index) => {
+            {activities.map((activity, index) => {
               const ActivityIcon = activityIcons[activity.type];
               return (
                 <motion.div
@@ -111,7 +111,7 @@ export default function TeamQuickView() {
 
         <div className="rounded-xl bg-muted p-4">
           <div className="space-y-1">
-            {wsTeamMembers.map((member, index) => {
+            {[...members].sort((a, b) => b.workload - a.workload).map((member, index) => {
               const cfg = statusConfig[member.status || 'offline'];
               return (
                 <motion.div
