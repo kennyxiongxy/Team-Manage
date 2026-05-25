@@ -36,7 +36,7 @@ function diffDays(a: string, b: string): number {
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr);
-  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+  return `${d.getMonth()+1}/${d.getDate()}`;
 }
 
 function getMember(task: any) {
@@ -79,16 +79,32 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
   const chartWidth = days * dayWidth;
 
   const dateLabels = useMemo(() => {
-    const labels: { date: string; label: string; isWeekend: boolean }[] = [];
+    const labels: { date: string; label: string; isWeekend: boolean; year: number }[] = [];
     for (let i = 0; i < days; i++) {
       const date = addDays(dateRange[0], i);
       const d = new Date(date);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
       const label = zoom === 'day' ? formatDateLabel(date) : (d.getDay() === 1 ? formatDateLabel(date) : '');
-      labels.push({ date, label, isWeekend });
+      labels.push({ date, label, isWeekend, year: d.getFullYear() });
     }
     return labels;
   }, [dateRange, days, zoom]);
+
+  // Year segments for header
+  const yearSegments = useMemo(() => {
+    const segs: { year: number; startIdx: number; span: number }[] = [];
+    let curYear = -1;
+    let start = 0;
+    dateLabels.forEach((dl, i) => {
+      if (dl.year !== curYear) {
+        if (curYear !== -1) segs.push({ year: curYear, startIdx: start, span: i - start });
+        curYear = dl.year;
+        start = i;
+      }
+    });
+    if (curYear !== -1) segs.push({ year: curYear, startIdx: start, span: dateLabels.length - start });
+    return segs;
+  }, [dateLabels]);
 
   // Sync vertical scroll between chart area and fixed column
   useEffect(() => {
@@ -183,6 +199,18 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
           {/* Scrollable chart bars */}
           <div ref={scrollContainerRef} className="flex-1 overflow-auto">
             <div style={{ width: chartWidth, maxHeight: '55vh' }}>
+              {/* Year headers */}
+              {yearSegments.length > 1 && (
+                <div className="flex border-b border-border/20 bg-muted/50">
+                  {yearSegments.map((seg) => (
+                    <div key={seg.year}
+                      className="shrink-0 flex items-center justify-center border-r border-border/30"
+                      style={{ width: seg.span * dayWidth }}>
+                      <span className="text-[11px] font-semibold text-muted-foreground/70">{seg.year}年</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* Date headers */}
               <div className="flex border-b border-border bg-muted">
                 {dateLabels.map((dl, i) => (
