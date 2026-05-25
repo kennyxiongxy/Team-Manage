@@ -473,8 +473,15 @@ function TodayTasksPanel({ onRefresh, refreshKey }: { onRefresh: () => void; ref
       if (res.success) setRealTasks(res.data || []);
     }).catch(() => {});
   }, [refreshKey]);
+  const today = new Date().toISOString().split('T')[0];
   const displayTasks = realTasks.length > 0 
-    ? realTasks.filter((t: any) => t.status === 'in-progress').slice(0, 4)
+    ? realTasks.filter((t: any) => {
+        // 今日任务：截止日期是今天，或今天开始的，或逾期未完成的
+        if (t.due_date === today || t.start_date === today) return true;
+        if (t.status === 'overdue') return true;
+        if (t.status === 'in-progress' && t.due_date && t.due_date <= today) return true;
+        return false;
+      }).slice(0, 6)
     : [];
 
   return (
