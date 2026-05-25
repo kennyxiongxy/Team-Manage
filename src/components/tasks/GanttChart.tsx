@@ -49,9 +49,10 @@ function getMember(task: any) {
 }
 
 export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
-  const [zoom, setZoom] = useState<'day' | 'week'>('day');
+  const [zoomLevel, setZoomLevel] = useState(3); // 1-5 scale
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const fixedColRef = useRef<HTMLDivElement>(null);
+  const baseDayWidth = [16, 24, 36, 48, 64]; // zoom levels
 
   const { dateRange, days } = useMemo(() => {
     const today = todayStr();
@@ -75,34 +76,37 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
 
   const today = todayStr();
   const todayOffset = diffDays(dateRange[0], today);
-  const dayWidth = zoom === 'day' ? 48 : 24;
+  const dayWidth = baseDayWidth[zoomLevel - 1] || 48;
   const chartWidth = days * dayWidth;
 
   const dateLabels = useMemo(() => {
-    const labels: { date: string; label: string; isWeekend: boolean; year: number }[] = [];
+    const labels: { date: string; label: string; isWeekend: boolean; year: number; month: number; isFirstOfMonth: boolean }[] = [];
     for (let i = 0; i < days; i++) {
       const date = addDays(dateRange[0], i);
       const d = new Date(date);
       const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-      const label = zoom === 'day' ? formatDateLabel(date) : (d.getDay() === 1 ? formatDateLabel(date) : '');
-      labels.push({ date, label, isWeekend, year: d.getFullYear() });
+      const isFirstOfMonth = d.getDate() === 1 || i === 0 || new Date(addDays(dateRange[0], i-1)).getMonth() !== d.getMonth();
+      const showLabel = zoomLevel >= 3 || d.getDay() === 1;
+      const label = showLabel ? formatDateLabel(date) : '';
+      labels.push({ date, label, isWeekend, year: d.getFullYear(), month: d.getMonth() + 1, isFirstOfMonth });
     }
     return labels;
-  }, [dateRange, days, zoom]);
+  }, [dateRange, days, zoomLevel]);
 
-  // Year segments for header
-  const yearSegments = useMemo(() => {
-    const segs: { year: number; startIdx: number; span: number }[] = [];
-    let curYear = -1;
+  // Month segments with year for header
+  const monthYearSegments = useMemo(() => {
+    const segs: { label: string; startIdx: number; span: number }[] = [];
+    let curKey = '';
     let start = 0;
     dateLabels.forEach((dl, i) => {
-      if (dl.year !== curYear) {
-        if (curYear !== -1) segs.push({ year: curYear, startIdx: start, span: i - start });
-        curYear = dl.year;
+      const key = `${dl.year}-${dl.month}`;
+      if (key !== curKey) {
+        if (curKey !== '') segs.push({ label: `${curKey.split('-')[0]}年${curKey.split('-')[1]}月`, startIdx: start, span: i - start });
+        curKey = key;
         start = i;
       }
     });
-    if (curYear !== -1) segs.push({ year: curYear, startIdx: start, span: dateLabels.length - start });
+    if (curKey !== '') segs.push({ label: `${curKey.split('-')[0]}年${curKey.split('-')[1]}月`, startIdx: start, span: dateLabels.length - start });
     return segs;
   }, [dateLabels]);
 
@@ -137,16 +141,16 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
       transition={{ duration: 0.3, ease: easeValues }}
     >
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setZoom('day')}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${zoom === 'day' ? 'bg-muted text-accent' : 'text-muted-foreground hover:text-foreground'}`}>
-            按天
-          </button>
-          <button onClick={() => setZoom('week')}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${zoom === 'week' ? 'bg-muted text-accent' : 'text-muted-foreground hover:text-foreground'}`}>
-            按周
-          </button>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-muted-foreground shrink-0">缩放</span>
+          <input
+            type="range"
+            min="1" max="5" value={zoomLevel}
+            onChange={e => setZoomLevel(Number(e.target.value))}
+            className="w-24 h-1 accent-primary cursor-pointer"
+          />
+          <span className="text-[10px] text-muted-foreground shrink-0">{['超小','小','中','大','超大'][zoomLevel-1]}</span>
         </div>
         <div className="text-xs text-muted-foreground">共 {tasks.length} 个任务</div>
       </div>
@@ -199,18 +203,16 @@ export default function GanttChart({ tasks, onTaskClick }: GanttChartProps) {
           {/* Scrollable chart bars */}
           <div ref={scrollContainerRef} className="flex-1 overflow-auto">
             <div style={{ width: chartWidth, maxHeight: '55vh' }}>
-              {/* Year headers */}
-              {yearSegments.length > 1 && (
-                <div className="flex border-b border-border/20 bg-muted/50">
-                  {yearSegments.map((seg) => (
-                    <div key={seg.year}
-                      className="shrink-0 flex items-center justify-center border-r border-border/30"
-                      style={{ width: seg.span * dayWidth }}>
-                      <span className="text-[11px] font-semibold text-muted-foreground/70">{seg.year}年</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Month-Year headers */}
+              <div className="flex border-b border-border/30 bg-muted/70">
+                {monthYearSegments.map((seg, si) => (
+                  <div key={si}
+                    className="shrink-0 flex items-center justify-center border-r border-border/40"
+                    style={{ width: seg.span * dayWidth }}>
+                    <span className="text-[11px] font-semibold text-muted-foreground whitespace-nowrap px-1">{seg.label}</span>
+                  </div>
+                ))}
+              </div>
               {/* Date headers */}
               <div className="flex border-b border-border bg-muted">
                 {dateLabels.map((dl, i) => (

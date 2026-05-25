@@ -103,6 +103,11 @@ export default function TaskDetailPanel({
   onClose,
   onUpdate,
 }: TaskDetailPanelProps) {
+  const { isEmployee } = useUserRole();
+  const helpApi = useHelpRequestsApi();
+  const [activeTab, setActiveTab] = useState<'info'|'subtasks'|'comments'|'ai'>('info');
+  const [showHelpPanel, setShowHelpPanel] = useState(false);
+  const [helpReason, setHelpReason] = useState('');
   const [aiExpanded, setAiExpanded] = useState(true);
   const [subTasksExpanded, setSubTasksExpanded] = useState(true);
   const [commentsExpanded, setCommentsExpanded] = useState(true);

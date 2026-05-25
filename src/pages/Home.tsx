@@ -948,59 +948,59 @@ function EmployeeDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* 问候 */}
+      {/* 问候 + AI提醒 并列 */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: easeOut }}
       >
-        <h1 className="text-xl font-bold text-foreground">
-          {greeting}，{user.name} 👋
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
-          <Calendar size={13} className="text-muted-foreground/60" />
-          {dateStr}
-        </p>
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-foreground">
+              {greeting}，{user.name} 👋
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
+              <Calendar size={13} className="text-muted-foreground/60" />
+              {dateStr}
+            </p>
+          </div>
+          <div className="lg:w-[280px] shrink-0">
+            <AiPersonalReminders />
+          </div>
+        </div>
       </motion.div>
 
-      {/* 个人 KPI + AI提醒 并列 */}
+      {/* 个人 KPI */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: easeOut }}
       >
-        <div className="flex flex-col lg:flex-row gap-5">
-          {/* KPI 卡片 */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <GlassCard>
-              <div className="p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">本周完成</p>
-                <p className="text-xl font-bold font-mono text-green-400">{weekCompleted}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
-              </div>
-            </GlassCard>
-            <GlassCard>
-              <div className="p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">进行中</p>
-                <p className="text-xl font-bold font-mono text-primary">{inProgressCount}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
-              </div>
-            </GlassCard>
-            <GlassCard>
-              <div className="p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">待开始</p>
-                <p className="text-xl font-bold font-mono text-orange-400">{notStartedCount}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
-              </div>
-            </GlassCard>
-            <GlassCard>
-              <div className="p-3 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">今日截止</p>
-                <p className="text-xl font-bold font-mono text-red-400">{dueToday}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
-              </div>
-            </GlassCard>
-          </div>
-          {/* AI提醒 */}
-          <div className="lg:w-[280px] shrink-0">
-            <AiPersonalReminders />
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <GlassCard>
+            <div className="p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">本周完成</p>
+              <p className="text-xl font-bold font-mono text-green-400">{weekCompleted}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">进行中</p>
+              <p className="text-xl font-bold font-mono text-primary">{inProgressCount}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">待开始</p>
+              <p className="text-xl font-bold font-mono text-orange-400">{notStartedCount}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
+            </div>
+          </GlassCard>
+          <GlassCard>
+            <div className="p-3 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">今日截止</p>
+              <p className="text-xl font-bold font-mono text-red-400">{dueToday}<span className="text-xs text-muted-foreground ml-0.5">个</span></p>
+            </div>
+          </GlassCard>
         </div>
       </motion.div>
 
