@@ -665,160 +665,155 @@ function TeamStatusCard({ refreshKey }: { refreshKey: number }) {
 }
 
 // ─── 活动流 ───
-function ActivityFeedCard() {
-  const activities = useMemo(() => [
-    { time: '2 分钟前', actor: '王芳', action: '完成了', detail: '首页导航重构', type: 'complete' as const },
-    { time: '15 分钟前', actor: '张伟', action: '提交了 PR', detail: 'API 接口优化', type: 'pr' as const },
-    { time: '1 小时前', actor: 'AI 助理', action: '生成了', detail: '团队周报预览', type: 'ai' as const },
-    { time: '2 小时前', actor: '李娜', action: '更新了', detail: '用户端设计方案', type: 'update' as const },
-    { time: '3 小时前', actor: '赵岩', action: '修复了', detail: '数据库连接池问题', type: 'fix' as const },
-  ], []);
+function ActivityFeedCard({ refreshKey }: { refreshKey: number }) {
+  const [activities, setActivities] = useState<any[]>([]);
+  useEffect(() => {
+    Promise.all([getTasks(), getProjects()]).then(([tRes, pRes]) => {
+      const tasks = (tRes?.data || []) as any[];
+      const projects = (pRes?.data || []) as any[];
+      const acts: any[] = [];
+      tasks.filter((t: any) => t.status === 'completed').slice(0, 3).forEach((t: any) => {
+        acts.push({ type: 'complete', actor: t.assignee_name || '团队成员', detail: t.title, time: t.due_date || '最近' });
+      });
+      tasks.filter((t: any) => t.status === 'in-progress').slice(0, 2).forEach((t: any) => {
+        acts.push({ type: 'update', actor: t.assignee_name || '团队成员', detail: t.title, time: t.due_date || '进行中' });
+      });
+      projects.filter((p: any) => p.status === 'at-risk' || (p.health_score && p.health_score < 70)).slice(0, 1).forEach((p: any) => {
+        acts.push({ type: 'fix', actor: '系统', detail: p.name + ' 健康度偏低', time: '需关注' });
+      });
+      tasks.filter((t: any) => t.status === 'not-started' && t.assignee_name).slice(0, 1).forEach((t: any) => {
+        acts.push({ type: 'pr', actor: t.assignee_name, detail: t.title, time: '待启动' });
+      });
+      setActivities(acts.slice(0, 6));
+    }).catch(() => {});
+  }, [refreshKey]);
 
-  const activityIcons: Record<string, React.ElementType> = {
-    complete: CheckCircle2,
-    pr: Bot,
-    ai: Sparkles,
-    update: FileText,
-    fix: Zap,
-  };
-
-  const activityColors: Record<string, string> = {
-    complete: '#22C55E',
-    pr: '#3B82F6',
-    ai: '#A855F7',
-    update: '#F97316',
-    fix: '#EF4444',
-  };
+  const activityIcons: Record<string, React.ElementType> = { complete: CheckCircle2, pr: Bot, ai: Sparkles, update: FileText, fix: Zap };
+  const activityColors: Record<string, string> = { complete: '#22C55E', pr: '#3B82F6', ai: '#A855F7', update: '#F97316', fix: '#EF4444' };
+  const actionLabels: Record<string, string> = { complete: '完成了', update: '推进中', fix: '需关注', pr: '待启动' };
 
   return (
-    <SectionCard
-      icon={Activity}
-      title="最近动态"
-      subtitle="团队实时活动"
-    >
+    <SectionCard icon={Activity} title="团队动态" subtitle="实时任务与项目状态">
       <div className="space-y-1">
-        {activities.map((act, i) => {
-          const Icon = activityIcons[act.type] || Activity;
-          const color = activityColors[act.type] || '#94A3B8';
-          return (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05, duration: 0.3 }}
-              className="flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-white/[0.03] transition-colors"
-            >
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                style={{ backgroundColor: `${color}18` }}
-              >
-                <Icon size={14} style={{ color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground">
-                  <span className="font-semibold">{act.actor}</span>
-                  <span className="text-muted-foreground"> {act.action} </span>
-                  <span className="font-medium">{act.detail}</span>
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-1">{act.time}</p>
-              </div>
-            </motion.div>
-          );
-        })}
+        {activities.length === 0 ? (
+          <div className="text-center py-8 text-sm text-muted-foreground">暂无动态数据</div>
+        ) : (
+          activities.map((act, i) => {
+            const Icon = activityIcons[act.type] || Activity;
+            const color = activityColors[act.type] || '#94A3B8';
+            return (
+              <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05, duration: 0.3 }}
+                className="flex items-start gap-3 px-3 py-3 rounded-lg hover:bg-white/[0.03] transition-colors">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ backgroundColor: color + '18' }}>
+                  <Icon size={14} style={{ color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground">
+                    <span className="font-semibold">{act.actor}</span>
+                    <span className="text-muted-foreground"> {actionLabels[act.type]} </span>
+                    <span className="font-medium">{act.detail}</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{act.time}</p>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
       </div>
     </SectionCard>
   );
 }
 
+
 // ─── 周报预览 ───
-function WeeklyPreviewCard() {
-  return (
-    <SectionCard
-      icon={FileText}
-      title="周报预览"
-      subtitle="本周团队概览"
-      action={
-        <Link
-          to="/reports"
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-accent transition-colors"
-        >
-          详细周报
-          <ChevronRight size={12} />
-        </Link>
+function WeeklyPreviewCard({ refreshKey }: { refreshKey: number }) {
+  const [weeklyData, setWeeklyData] = useState({ completed: 0, inProgress: 0, overdue: 0, notStarted: 0, total: 0 });
+  useEffect(() => {
+    getTasks().then((res: any) => {
+      if (res.success && res.data) {
+        const tasks = res.data;
+        setWeeklyData({
+          completed: tasks.filter((t: any) => t.status === 'completed').length,
+          inProgress: tasks.filter((t: any) => t.status === 'in-progress').length,
+          overdue: tasks.filter((t: any) => t.status === 'overdue').length,
+          notStarted: tasks.filter((t: any) => t.status === 'not-started').length,
+          total: tasks.length,
+        });
       }
-    >
+    }).catch(() => {});
+  }, [refreshKey]);
+  const rate = weeklyData.total > 0 ? Math.round((weeklyData.completed / weeklyData.total) * 100) : 0;
+
+  return (
+    <SectionCard icon={FileText} title="周报预览" subtitle="本周团队概览"
+      action={<Link to="/reports" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-accent transition-colors">详细周报<ChevronRight size={12} /></Link>}>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white/[0.03] rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-green-400">{mockWeeklyReport.completed}</p>
+          <p className="text-2xl font-bold font-mono text-green-400">{weeklyData.completed}</p>
           <p className="text-xs text-muted-foreground mt-1">已完成</p>
         </div>
         <div className="bg-white/[0.03] rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-primary">{mockWeeklyReport.new}</p>
+          <p className="text-2xl font-bold font-mono text-primary">{weeklyData.inProgress}</p>
           <p className="text-xs text-muted-foreground mt-1">进行中</p>
         </div>
         <div className="bg-white/[0.03] rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-red-400">{mockWeeklyReport.overdue}</p>
+          <p className="text-2xl font-bold font-mono text-red-400">{weeklyData.overdue}</p>
           <p className="text-xs text-muted-foreground mt-1">已逾期</p>
         </div>
         <div className="bg-white/[0.03] rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold font-mono text-orange-400">{mockWeeklyReport.aiInterventions}%</p>
-          <p className="text-xs text-muted-foreground mt-1">团队效率</p>
+          <p className="text-2xl font-bold font-mono text-orange-400">{rate}%</p>
+          <p className="text-xs text-muted-foreground mt-1">完成率</p>
         </div>
       </div>
-
-      {/* 每周任务完成分布 */}
       <div className="mb-6">
-        <p className="text-xs text-muted-foreground mb-3 font-medium">本周每日任务完成</p>
+        <p className="text-xs text-muted-foreground mb-3 font-medium">任务状态分布</p>
         <div className="h-28 flex items-end gap-2">
-          {mockDailyCompletionData.length > 0 ? (
-            mockDailyCompletionData.map((d) => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: `${(d.completed / 10) * 100}%` }}
-                  transition={{ duration: 0.5, ease: 'easeOut' }}
-                  className="w-full rounded-t-sm bg-gradient-to-t from-accent to-accent/40 opacity-70 hover:opacity-100 transition-opacity"
-                  style={{ minHeight: '4px', maxHeight: '100%' }}
-                  title={`${d.day}: ${d.completed}`}
-                />
-              </div>
-            ))
-          ) : (
-            <div className="w-full flex items-end gap-2">
-              {['一','二','三','四','五','六','日'].map((day, i) => (
-                <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${(i + 1) * 12}%` }}
-                    transition={{ duration: 0.5, delay: i * 0.05, ease: 'easeOut' }}
-                    className="w-full rounded-t-sm bg-gradient-to-t from-accent to-accent/40 opacity-60"
-                    style={{ minHeight: '4px' }}
-                  />
-                  <span className="text-[9px] text-muted-foreground">{day}</span>
+          {weeklyData.total > 0 ? (
+            ['completed', 'in-progress', 'not-started', 'overdue'].map((status) => {
+              const count = status === 'completed' ? weeklyData.completed : status === 'in-progress' ? weeklyData.inProgress : status === 'overdue' ? weeklyData.overdue : weeklyData.notStarted;
+              const colors: Record<string, string> = { completed: '#22C55E', 'in-progress': '#3B82F6', 'not-started': '#F97316', overdue: '#EF4444' };
+              const labels: Record<string, string> = { completed: '已完成', 'in-progress': '进行中', 'not-started': '待开始', overdue: '逾期' };
+              const maxH = Math.max(count / Math.max(weeklyData.total, 1) * 100, 4);
+              return (
+                <div key={status} className="flex-1 flex flex-col items-center gap-1">
+                  <motion.div initial={{ height: 0 }} animate={{ height: maxH + '%' }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className="w-full rounded-t-sm opacity-70 hover:opacity-100 transition-opacity"
+                    style={{ background: 'linear-gradient(to top, ' + colors[status] + ', ' + colors[status] + '40)' }} />
+                  <span className="text-[9px] text-muted-foreground">{labels[status]}</span>
+                  <span className="text-[10px] font-mono font-bold" style={{ color: colors[status] }}>{count}</span>
                 </div>
-              ))}
+              );
+            })
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">暂无数据</p>
             </div>
           )}
         </div>
       </div>
-
-      {/* AI 建议 */}
-      {mockWeeklySuggestions.length > 0 && (
-        <div>
-          <p className="text-xs text-muted-foreground mb-3 font-medium">AI 管理建议</p>
-          <ul className="space-y-2">
-            {mockWeeklySuggestions.map((s, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
-                <span className="text-accent mt-1 flex-shrink-0">•</span>
-                <span className="leading-relaxed">{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="space-y-3">
+        {weeklyData.overdue > 0 ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.3 }}
+            className="px-4 py-3 bg-white/[0.03] rounded-xl border border-border hover:border-accent/30 transition-colors">
+            <div className="flex items-start gap-3">
+              <Lightbulb size={14} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-foreground">有 {weeklyData.overdue} 个逾期任务，建议今天优先处理</p>
+            </div>
+          </motion.div>
+        ) : weeklyData.total > 0 ? (
+          <div className="text-center py-4"><p className="text-sm text-muted-foreground">🎉 暂无逾期，团队运转良好</p></div>
+        ) : (
+          <div className="text-center py-4"><p className="text-sm text-muted-foreground">暂无团队数据</p></div>
+        )}
+      </div>
     </SectionCard>
   );
 }
+
 
 /* ─── ManagerDashboard ─── */
 function ManagerDashboard() {
@@ -899,14 +894,14 @@ function ManagerDashboard() {
           <TodayTasksPanel onRefresh={refreshDashboard} refreshKey={refreshKey} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <ProjectProgressCard refreshKey={refreshKey} />
-            <WeeklyPreviewCard />
+            <WeeklyPreviewCard refreshKey={refreshKey} />
           </div>
         </div>
 
         {/* 右栏 — 侧边信息 */}
         <div className="w-full lg:w-[340px] xl:w-[380px] flex-shrink-0 space-y-8">
           <TeamStatusCard refreshKey={refreshKey} />
-          <ActivityFeedCard />
+          <ActivityFeedCard refreshKey={refreshKey} />
         </div>
       </div>
 
