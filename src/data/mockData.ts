@@ -58,6 +58,7 @@ export interface Task {
   projectId?: string;
   startDate?: string;
   completedDate?: string;
+  createdAt?: string;  // 来自后端 created_at
   subTasks?: SubTask[];
   comments?: Comment[];
   activityLog?: ActivityLogItem[];

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -15,6 +15,9 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
+  Play,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import {
   priorityConfig,
@@ -30,9 +33,45 @@ interface TaskDetailPanelProps {
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
-function getMember(task: any) { if (task.assignee && task.assignee !== "未分配") return { name: task.assignee, avatar: "" }; return null; }
+function getMember(task: any) { 
+  // task could be a string (assignee name) or an object with .assignee
+  const name = typeof task === 'string' ? task : (task?.assignee || task?.name || '');
+  if (name && name !== '未分配') return { name, avatar: task?.avatar_url || task?.assignee_avatar || '' };
+  return null;
+}
 
 function getProject(task: any) { if (task.project && task.project !== "未分配") return { name: task.project, color: "#3B82F6" }; return null; }
+
+function UserAvatar({ name, src, size = 28 }: { name?: string; src?: string; size?: number }) {
+  const initial = (name || '?')[0].toUpperCase();
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name || ''}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+        }}
+      />
+    );
+  }
+  const colors = ['#3B82F6', '#22C55E', '#F97316', '#A855F7', '#06B6D4', '#EF4444', '#EC4899'];
+  const color = colors[(name || '?').charCodeAt(0) % colors.length];
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: '50%',
+        backgroundColor: color + '20', color: color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size * 0.4, fontWeight: 700, flexShrink: 0,
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -64,11 +103,36 @@ export default function TaskDetailPanel({
   const [commentsExpanded, setCommentsExpanded] = useState(true);
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
+  const [aiInsight, setAiInsight] = useState<{ estimatedCompletion: string; riskLevel: string; suggestion: string } | null>(null);
+  const [aiInsightLoading, setAiInsightLoading] = useState(false);
+
+  // 获取AI洞察
+  useEffect(() => {
+    if (!task?.id) return;
+    let cancelled = false;
+    setAiInsightLoading(true);
+    setAiInsight(null);
+    const token = localStorage.getItem('token');
+    fetch('/api/ai/task-insight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ taskId: task.id }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled && data.success) setAiInsight(data.data);
+      })
+      .catch(e => console.warn('AI insight fetch failed:', e))
+      .finally(() => { if (!cancelled) setAiInsightLoading(false); });
+    return () => { cancelled = true; };
+  }, [task?.id]);
 
   if (!task) return null;
 
-  const assignee = getMember(task.assigneeId ?? '');
-  const project = getProject(task.projectId ?? '');
+  const assignee = task.assignee && task.assignee !== '未分配' ? { name: task.assignee, avatar: task.assigneeAvatar || '' } : null;
+  const project = task.project && task.project !== '未分配' ? { name: task.project, color: '#3B82F6' } : null;
   const priority = priorityConfig[task.priority];
   const status = statusConfig[task.status];
   const completedSubTasks = (task.subTasks ?? []).filter((st) => st.completed).length;
@@ -187,11 +251,7 @@ export default function TaskDetailPanel({
               <div className="flex items-center gap-3">
                 {assignee && (
                   <>
-                    <img
-                      src={assignee.avatar}
-                      alt={assignee.name}
-                      className="w-8 h-8 rounded-full"
-                    />
+                    <UserAvatar name={assignee.name} src={assignee.avatar} size={28} />
                     <div>
                       <div className="text-sm text-foreground">{assignee.name}</div>
                       <div className="text-xs text-muted-foreground">{assignee.role}</div>
@@ -203,13 +263,7 @@ export default function TaskDetailPanel({
                     {(task.collaboratorIds ?? []).slice(0, 3).map((cid) => {
                       const m = getMember(cid);
                       return m ? (
-                        <img
-                          key={cid}
-                          src={m.avatar}
-                          alt={m.name}
-                          className="w-6 h-6 rounded-full border-2 border-[#1E293B]"
-                          title={m.name}
-                        />
+                        <UserAvatar name={m.name} src={m.avatar} size={24} />
                       ) : null;
                     })}
                   </div>
@@ -219,35 +273,20 @@ export default function TaskDetailPanel({
 
             {/* Time Info */}
             <div className="grid grid-cols-2 gap-3">
-              <div
-                className="p-3 rounded-lg bg-card cursor-pointer hover:bg-card/80 transition-colors group relative"
-                onClick={() => {
-                  const input = document.getElementById('due-date-picker') as HTMLInputElement;
-                  input?.showPicker?.();
-                  input?.click();
-                }}
-              >
+              <div className="p-3 rounded-lg bg-card group">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Calendar className="w-3.5 h-3.5" />
                   截止日期
-                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-accent ml-auto transition-opacity">点击修改</span>
-                </div>
-                <div
-                  className="text-sm font-medium"
-                  style={{
-                    color:
-                      new Date(task.dueDate) < new Date() && task.status !== 'completed'
-                        ? '#EF4444'
-                        : '#F8FAFC',
-                  }}
-                >
-                  {formatDate(task.dueDate)}
                 </div>
                 <input
                   id="due-date-picker"
                   type="date"
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  value={task.dueDate}
+                  className="w-full bg-transparent text-sm font-medium text-foreground border-none outline-none cursor-pointer focus:ring-1 focus:ring-accent rounded p-0"
+                  style={{
+                    color: task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
+                      ? '#EF4444' : '#F8FAFC',
+                  }}
+                  value={task.dueDate || ''}
                   onChange={(e) => {
                     const newDate = e.target.value;
                     if (newDate) {
@@ -263,13 +302,30 @@ export default function TaskDetailPanel({
                   创建日期
                 </div>
                 <div className="text-sm font-medium text-foreground">
-                  {formatDate(task.startDate ?? task.completedDate ?? task.dueDate)}
+                  {formatDate(task.createdAt || task.startDate || task.dueDate)}
                 </div>
               </div>
             </div>
 
-            {/* Progress */}
+            {/* 启动任务 / 进度 */}
             <div>
+              {task.status === 'not-started' && (
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    onUpdate(task.id, {
+                      status: 'in-progress',
+                      startDate: task.startDate || today,
+                      progress: 5,
+                    });
+                    toast.success('🚀 任务已启动', { description: '状态已更新为「进行中」' });
+                  }}
+                  className="w-full mb-3 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gradient-to-r from-[#06B6D4] to-[#22C55E] text-white text-sm font-medium hover:shadow-[0_0_16px_rgba(6,182,212,0.3)] transition-all"
+                >
+                  <Play className="w-4 h-4" />
+                  启动任务
+                </button>
+              )}
               <label className="text-xs font-medium text-muted-foreground mb-2 block">
                 进度 ({task.progress}%)
               </label>
@@ -288,16 +344,59 @@ export default function TaskDetailPanel({
             </div>
 
             {/* Description */}
-            {task.description && (
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground">
                   描述
                 </label>
-                <p className="text-sm text-foreground leading-relaxed">
-                  {task.description}
-                </p>
+                {!editingDescription && (
+                  <button
+                    onClick={() => {
+                      setDescDraft(task.description || '');
+                      setEditingDescription(true);
+                    }}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    编辑
+                  </button>
+                )}
               </div>
-            )}
+              {editingDescription ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={descDraft}
+                    onChange={(e) => setDescDraft(e.target.value)}
+                    placeholder="输入任务描述..."
+                    className="w-full min-h-[80px] px-3 py-2 rounded-lg bg-card border border-border text-sm text-foreground placeholder-[#64748B] focus:outline-none focus:border-accent resize-y"
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setEditingDescription(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={() => {
+                        onUpdate(task.id, { description: descDraft });
+                        setEditingDescription(false);
+                        toast.success('描述已更新');
+                      }}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors"
+                    >
+                      <Check className="w-3 h-3" />
+                      保存
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground leading-relaxed">
+                  {task.description || '暂无描述，点击「编辑」添加'}
+                </p>
+              )}
+            </div>
 
             {/* Sub Tasks */}
             <div>
@@ -338,11 +437,7 @@ export default function TaskDetailPanel({
                           {st.title}
                         </span>
                         {st.assigneeId && (
-                          <img
-                            src={getMember(st.assigneeId)?.avatar}
-                            alt=""
-                            className="w-5 h-5 rounded-full"
-                          />
+                          <UserAvatar name={getMember(st.assigneeId)?.name} src={getMember(st.assigneeId)?.avatar} size={20} />
                         )}
                       </div>
                     ))}
@@ -378,43 +473,29 @@ export default function TaskDetailPanel({
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">预计完成：</span>
-                      {(() => {
-                        const remaining = 100 - task.progress;
-                        const daysPerPercent = task.progress > 0
-                          ? (new Date().getTime() - new Date(task.startDate || task.dueDate).getTime()) / (1000*60*60*24) / task.progress
-                          : 1;
-                        const estDays = Math.ceil(remaining * daysPerPercent);
-                        const estDate = new Date();
-                        estDate.setDate(estDate.getDate() + estDays);
-                        const estStr = `${estDate.getFullYear()}-${String(estDate.getMonth()+1).padStart(2,'0')}-${String(estDate.getDate()).padStart(2,'0')}`;
-                        const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'completed';
-                        if (isOverdue) {
-                          return <><span className="text-destructive">已逾期</span>（原截止 {formatDate(task.dueDate)}）</>;
-                        }
-                        if (estStr > task.dueDate) {
-                          return <><span className="text-yellow-400">预计 {formatDate(estStr)}</span>（可能延期，原截止 {formatDate(task.dueDate)}）</>;
-                        }
-                        return <span>按当前进度，预计 {formatDate(task.dueDate)} 完成（{task.progress}% 进度正常）</span>;
-                      })()}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">风险等级：</span>
-                      {task.priority === 'urgent' || task.priority === 'high'
-                        ? '高风险 - 建议每日跟进'
-                        : task.priority === 'medium'
-                          ? '中风险 - 建议每周检查'
-                          : '低风险 - 正常推进'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <span className="text-foreground">AI 建议：</span>
-                      {task.progress < 30 && task.status === 'in-progress'
-                        ? '进度较慢，建议检查阻塞原因'
-                        : task.progress > 80
-                          ? '即将完成，准备验收工作'
-                          : '进度正常，继续保持'}
-                    </div>
+                    {aiInsightLoading ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <div className="w-3 h-3 border-2 border-[#A855F7] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-muted-foreground">AI 正在分析任务...</span>
+                      </div>
+                    ) : aiInsight ? (
+                      <>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">预计完成：</span>
+                          {aiInsight.estimatedCompletion}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">风险等级：</span>
+                          {aiInsight.riskLevel}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <span className="text-foreground">AI 建议：</span>
+                          {aiInsight.suggestion}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-muted-foreground py-1">无法加载 AI 洞察</div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -447,11 +528,8 @@ export default function TaskDetailPanel({
                       const author = getMember(comment.authorId ?? comment.author ?? '');
                       return (
                         <div key={comment.id} className="flex gap-3">
-                          <img
-                            src={author?.avatar}
-                            alt={author?.name}
-                            className="w-7 h-7 rounded-full shrink-0 self-start"
-                          />
+<UserAvatar name={author?.name} src={author?.avatar} size={28} />
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="text-sm font-medium text-foreground">

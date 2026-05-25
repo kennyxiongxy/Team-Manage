@@ -38,7 +38,7 @@ const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
 export default function TaskCenter() {
   const { isEmployee, user } = useUserRole();
-  const { tasks, loading: tasksLoading, addTask, editTask } = useTasks();
+  const { tasks, loading: tasksLoading, addTask, editTask, removeTask } = useTasks();
   const { users: teamMembers } = useUsers();
   const { projects } = useProjects();
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
@@ -50,6 +50,45 @@ export default function TaskCenter() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchPriorityOpen, setBatchPriorityOpen] = useState(false);
+  const [batchAssigneeOpen, setBatchAssigneeOpen] = useState(false);
+
+  // 批量操作处理函数
+  const handleBatchPriority = async (priority: Priority) => {
+    setBatchPriorityOpen(false);
+    try {
+      await Promise.all(selectedIds.map(id => editTask(id, { priority })));
+      toast.success(`已更新 ${selectedIds.length} 个任务的优先级`);
+      setSelectedIds([]);
+    } catch (e: any) { toast.error(e.message || '更新失败'); }
+  };
+
+  const handleBatchAssignee = async (assigneeId: string) => {
+    setBatchAssigneeOpen(false);
+    try {
+      await Promise.all(selectedIds.map(id => editTask(id, { assigneeId })));
+      const member = teamMembers.find(m => m.id === assigneeId);
+      toast.success(`已将 ${selectedIds.length} 个任务分配给 ${member?.name || '所选成员'}`);
+      setSelectedIds([]);
+    } catch (e: any) { toast.error(e.message || '更新失败'); }
+  };
+
+  const handleBatchRemind = () => {
+    const selectedTasks = tasks.filter(t => selectedIds.includes(t.id));
+    const names = [...new Set(selectedTasks.map(t => t.assignee || '未分配'))];
+    toast.success(`已向 ${names.length} 位成员发送提醒`, {
+      description: names.join('、'),
+    });
+    setSelectedIds([]);
+  };
+
+  const handleBatchDelete = async () => {
+    try {
+      await Promise.all(selectedIds.map(id => removeTask(id)));
+      toast.success(`已删除 ${selectedIds.length} 个任务`);
+      setSelectedIds([]);
+    } catch (e: any) { toast.error(e.message || '删除失败'); }
+  };
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -421,19 +460,61 @@ export default function TaskCenter() {
                 取消
               </button>
             </div>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors">
-              <Flag className="w-3.5 h-3.5" />
-              更改优先级
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors">
-              <UserCircle className="w-3.5 h-3.5" />
-              更改负责人
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors">
+            {/* 更改优先级 */}
+            <div className="relative">
+              <button
+                onClick={() => { setBatchPriorityOpen(!batchPriorityOpen); setBatchAssigneeOpen(false); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                更改优先级
+              </button>
+              {batchPriorityOpen && (
+                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-lg shadow-lg p-1 z-40 min-w-[100px]">
+                  {(['urgent', 'high', 'medium', 'low'] as Priority[]).map(p => (
+                    <button key={p}
+                      onClick={() => handleBatchPriority(p)}
+                      className="block w-full text-left px-3 py-1.5 rounded text-xs hover:bg-muted transition-colors"
+                    >
+                      {priorityConfig[p]?.label || p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* 更改负责人 */}
+            <div className="relative">
+              <button
+                onClick={() => { setBatchAssigneeOpen(!batchAssigneeOpen); setBatchPriorityOpen(false); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                <UserCircle className="w-3.5 h-3.5" />
+                更改负责人
+              </button>
+              {batchAssigneeOpen && (
+                <div className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-lg shadow-lg p-1 z-40 min-w-[120px] max-h-[200px] overflow-y-auto">
+                  {teamMembers.filter(m => m.id).slice(0, 12).map(m => (
+                    <button key={m.id}
+                      onClick={() => handleBatchAssignee(m.id)}
+                      className="block w-full text-left px-3 py-1.5 rounded text-xs hover:bg-muted transition-colors"
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleBatchRemind}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            >
               <Send className="w-3.5 h-3.5" />
               批量提醒
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
+            <button
+              onClick={handleBatchDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
               <Trash2 className="w-3.5 h-3.5" />
               删除
             </button>
@@ -446,6 +527,8 @@ export default function TaskCenter() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         onCreate={handleCreateTask}
+        projects={projects}
+        teamMembers={teamMembers.map((m: any) => ({ id: m.id, name: m.name, role: m.role }))}
       />
 
       {/* Task Detail Panel */}

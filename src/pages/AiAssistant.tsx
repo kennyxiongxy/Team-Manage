@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUserRole } from '@/context/UserRoleContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import ChatInterface from '@/components/ai-assistant/ChatInterface';
@@ -424,11 +425,13 @@ function SuggestionsReportCard() {
                 const dueDate = new Date(today);
                 dueDate.setDate(dueDate.getDate() + 7);
                 const formatDate = (d: Date) => d.toISOString().split('T')[0];
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
                 return api.post('/api/tasks', {
                   title: s.text.slice(0, 40),
                   description: s.text,
                   priority: 'high',
                   status: 'not-started',
+                  assigneeId: user.id || null,
                   start_date: formatDate(today),
                   due_date: formatDate(dueDate),
                 });
