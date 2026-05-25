@@ -194,9 +194,6 @@ export default function TaskDetailPanel({
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-xs font-mono text-muted-foreground shrink-0">
-                {task.id}
-              </span>
               <h3 className="text-base font-semibold text-foreground truncate">
                 {task.title}
               </h3>
