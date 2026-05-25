@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -11,17 +11,22 @@ import {
   Circle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { TimelineTask } from '@/data/mockData';
-import { todayTasks, yesterdayTasks, tomorrowTasks } from '@/data/mockData';
+import type { Task } from '@/data/mockData';
+import { getTasks } from '@/api/client';
+import { useUserRole } from '@/context/UserRoleContext';
 import { useHelpRequests } from '@/context/HelpRequestContext';
 
 type DateTab = 'yesterday' | 'today' | 'tomorrow';
 
-const tasksByDate: Record<DateTab, TimelineTask[]> = {
-  yesterday: yesterdayTasks,
-  today: todayTasks,
-  tomorrow: tomorrowTasks,
-};
+function toTimelineTask(t: any): any {
+  return {
+    id: t.id, title: t.title, description: t.description || '',
+    priority: t.priority || 'medium', status: t.status || 'not-started',
+    progress: t.progress || 0, assignee: t.assignee_name || '未分配',
+    dueDate: t.due_date || t.dueDate || '', project: t.project_name || '',
+    startDate: t.start_date || t.startDate || '',
+  };
+}
 
 const priorityColors: Record<string, string> = {
   urgent: '#EF4444',
@@ -45,16 +50,51 @@ const dateTabLabels: Record<DateTab, string> = {
 };
 
 export default function TodayTimeline() {
+  const { user } = useUserRole();
   const [activeTab, setActiveTab] = useState<DateTab>('today');
-  const [tasks, setTasks] = useState<TimelineTask[]>(todayTasks);
+  const [allMyTasks, setAllMyTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [helpPanel, setHelpPanel] = useState<string | null>(null);
   const [helpReason, setHelpReason] = useState('');
   const [notePanel, setNotePanel] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
 
+  useEffect(() => {
+    getTasks().then((res: any) => {
+      if (res.success && res.data) {
+        const mine = res.data.filter((t: any) =>
+          t.assignee_id === user.id || t.assignee_name === user.name
+        );
+        setAllMyTasks(mine);
+      }
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [user.id, user.name]);
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  const filteredTasks = allMyTasks.filter((t: any) => {
+    const due = (t.due_date || t.dueDate || '').slice(0, 10);
+    const start = (t.start_date || t.startDate || '').slice(0, 10);
+    switch (activeTab) {
+      case 'today': return due === today || start === today || t.status === 'overdue' || (t.status === 'in-progress' && due && due <= today);
+      case 'yesterday': return due === yesterday || start === yesterday;
+      case 'tomorrow': return due === tomorrow || start === tomorrow;
+      default: return false;
+    }
+  }).sort((a: any, b: any) => {
+    const da = (a.due_date || a.dueDate || '').slice(0, 10);
+    const db = (b.due_date || b.dueDate || '').slice(0, 10);
+    const aToday = da === today ? 0 : 1;
+    const bToday = db === today ? 0 : 1;
+    return aToday - bToday || da.localeCompare(db);
+  });
+
+  const displayTasks = filteredTasks.map(toTimelineTask);
+
   const handleTabChange = (tab: DateTab) => {
     setActiveTab(tab);
-    setTasks(tasksByDate[tab]);
   };
 
   const updateProgress = (taskId: string, newProgress: number) => {
@@ -107,7 +147,7 @@ export default function TodayTimeline() {
             {new Date().getMonth() + 1}/{new Date().getDate()}
           </span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-            {tasks.length} 个
+            {displayTasks.length} 个
           </span>
         </div>
         <div className="flex rounded-lg bg-muted p-1">
@@ -142,13 +182,13 @@ export default function TodayTimeline() {
           <div className="absolute left-[22px] top-0 hidden h-full w-[2px] bg-muted sm:block" />
 
           <div className="space-y-4">
-            {tasks.length === 0 ? (
+            {displayTasks.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                <p>暂无任务</p>
-                <p className="text-xs mt-1">连接飞书后可同步今日任务</p>
+                <p>{loading ? '加载中...' : '暂无任务'}</p>
+                <p className="text-xs mt-1">{loading ? '' : '今天没有需要关注的任务'}</p>
               </div>
             ) : (
-              tasks.map((task, index) => (
+              displayTasks.map((task, index) => (
                 <TimelineNode
                   key={task.id}
                   task={task}
