@@ -967,23 +967,32 @@ function EmployeeDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      {/* 问候 + AI提醒 并列 */}
+      {/* 问候信息 + AI提醒 并列 */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: easeOut }}
       >
         <div className="flex flex-col lg:flex-row gap-5 items-start">
+          {/* 左侧：问候 + 今日摘要 */}
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-foreground">
               {greeting}，{user.name} 👋
             </h1>
             <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-2">
               <Calendar size={13} className="text-muted-foreground/60" />
-              {dateStr}
+              {now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })} · 本周第 {Math.ceil((now.getDate() - now.getDay() + 1) / 7) || 1} 个工作日
+            </p>
+            <p className="text-sm text-foreground mt-2">
+              今天你有 <span className="font-semibold text-accent">{myTasks.length}</span> 个任务
+              {myTasks.filter((t: any) => t.priority === 'urgent' || t.priority === 'high').length > 0 && (
+                <>, 其中 <span className="font-semibold text-red-400">{myTasks.filter((t: any) => t.priority === 'urgent' || t.priority === 'high').length}</span> 紧急</>
+              )}
+              {dueToday > 0 && <>, <span className="font-semibold text-yellow-400">{dueToday}</span> 个今日截止</>}
             </p>
           </div>
-          <div className="lg:w-[280px] shrink-0">
+          {/* 右侧：AI提醒 */}
+          <div className="lg:w-[300px] shrink-0">
             <AiPersonalReminders />
           </div>
         </div>
