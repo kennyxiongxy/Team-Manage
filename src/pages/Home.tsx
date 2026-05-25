@@ -468,22 +468,29 @@ function QuickActionsBar() {
 function TodayTasksPanel({ onRefresh, refreshKey }: { onRefresh: () => void; refreshKey: number }) {
   const navigate = useNavigate();
   const [realTasks, setRealTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
+    setLoading(true);
     getTasks().then((res: any) => {
       if (res.success) setRealTasks(res.data || []);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [refreshKey]);
   const today = new Date().toISOString().split('T')[0];
   const displayTasks = realTasks.length > 0 
     ? realTasks.filter((t: any) => {
-        // 统一截取日期部分，避免时间戳影响比较
         const due = (t.due_date || t.dueDate || '').slice(0, 10);
         const start = (t.start_date || t.startDate || '').slice(0, 10);
-        // 今日任务：截止日期是今天，或今天开始的，或逾期未完成的
         if (due === today || start === today) return true;
         if (t.status === 'overdue') return true;
         if (t.status === 'in-progress' && due && due <= today) return true;
         return false;
+      }).sort((a: any, b: any) => {
+        // 今日到期的排最前，逾期的次之
+        const da = (a.due_date || a.dueDate || '').slice(0, 10);
+        const db = (b.due_date || b.dueDate || '').slice(0, 10);
+        const aToday = da === today ? 0 : (a.status === 'overdue' ? 1 : 2);
+        const bToday = db === today ? 0 : (b.status === 'overdue' ? 1 : 2);
+        return aToday - bToday || da.localeCompare(db);
       }).slice(0, 6)
     : [];
 
@@ -502,13 +509,20 @@ function TodayTasksPanel({ onRefresh, refreshKey }: { onRefresh: () => void; ref
         </Link>
       }
     >
-      {displayTasks.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-10">
+          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <ListTodo size={24} className="text-muted-foreground/40" />
+          </div>
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
+      ) : displayTasks.length === 0 ? (
         <div className="text-center py-10">
           <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
             <ListTodo size={24} className="text-muted-foreground/40" />
           </div>
-          <p className="text-sm text-muted-foreground">暂无任务数据</p>
-          <p className="text-xs text-muted-foreground/60 mt-1">同步飞书表格后可查看任务</p>
+          <p className="text-sm text-muted-foreground">暂无今日任务</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">所有任务进展顺利，今天没有需要关注的</p>
         </div>
       ) : (
         <div className="space-y-3">
