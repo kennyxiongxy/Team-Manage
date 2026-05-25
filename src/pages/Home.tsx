@@ -983,13 +983,7 @@ function EmployeeDashboard() {
               <Calendar size={13} className="text-muted-foreground/60" />
               {now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })} · 本周第 {Math.ceil((now.getDate() - now.getDay() + 1) / 7) || 1} 个工作日
             </p>
-            <p className="text-sm text-foreground mt-2">
-              今天你有 <span className="font-semibold text-accent">{myTasks.length}</span> 个任务
-              {myTasks.filter((t: any) => t.priority === 'urgent' || t.priority === 'high').length > 0 && (
-                <>, 其中 <span className="font-semibold text-red-400">{myTasks.filter((t: any) => t.priority === 'urgent' || t.priority === 'high').length}</span> 紧急</>
-              )}
-              {dueToday > 0 && <>, <span className="font-semibold text-yellow-400">{dueToday}</span> 个今日截止</>}
-            </p>
+
           </div>
           {/* 右侧：AI提醒 */}
           <div className="lg:w-[300px] shrink-0">
