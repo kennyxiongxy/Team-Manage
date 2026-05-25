@@ -34,9 +34,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <main
-        className="pt-16 min-h-[100dvh] transition-all duration-300 lg:ml-60"
+        className="pt-16 min-h-[100dvh] transition-all duration-300 lg:ml-60 flex flex-col"
       >
-        <div className="p-4 lg:p-6 pb-20">
+        <div className="flex-1 p-4 lg:p-6">
           {children}
         </div>
         <Footer />
