@@ -921,12 +921,30 @@ function ManagerDashboard() {
 
 function EmployeeDashboard() {
   const { user } = useUserRole();
+  const [myTasks, setMyTasks] = useState<any[]>([]);
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
   const dateStr = now.toLocaleDateString('zh-CN', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
   });
+  const today = now.toISOString().split('T')[0];
+
+  useEffect(() => {
+    getTasks().then((res: any) => {
+      if (res.success && res.data) {
+        const mine = res.data.filter((t: any) =>
+          t.assignee_id === user.id || t.assignee_name === user.name
+        );
+        setMyTasks(mine);
+      }
+    }).catch(() => {});
+  }, [user.id, user.name]);
+
+  const weekCompleted = myTasks.filter((t: any) => t.status === 'completed').length;
+  const inProgressCount = myTasks.filter((t: any) => t.status === 'in-progress').length;
+  const notStartedCount = myTasks.filter((t: any) => t.status === 'not-started').length;
+  const dueToday = myTasks.filter((t: any) => t.due_date === today || t.dueDate === today).length;
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -955,25 +973,25 @@ function EmployeeDashboard() {
           <GlassCard>
             <div className="p-5 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">本周完成</p>
-              <p className="text-2xl font-bold font-mono text-green-400">0<span className="text-sm text-muted-foreground ml-1">个</span></p>
+              <p className="text-2xl font-bold font-mono text-green-400">{weekCompleted}<span className="text-sm text-muted-foreground ml-1">个</span></p>
             </div>
           </GlassCard>
           <GlassCard>
             <div className="p-5 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">进行中</p>
-              <p className="text-2xl font-bold font-mono text-primary">0<span className="text-sm text-muted-foreground ml-1">个</span></p>
+              <p className="text-2xl font-bold font-mono text-primary">{inProgressCount}<span className="text-sm text-muted-foreground ml-1">个</span></p>
             </div>
           </GlassCard>
           <GlassCard>
             <div className="p-5 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">待开始</p>
-              <p className="text-2xl font-bold font-mono text-orange-400">0<span className="text-sm text-muted-foreground ml-1">个</span></p>
+              <p className="text-2xl font-bold font-mono text-orange-400">{notStartedCount}<span className="text-sm text-muted-foreground ml-1">个</span></p>
             </div>
           </GlassCard>
           <GlassCard>
             <div className="p-5 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">今日截止</p>
-              <p className="text-2xl font-bold font-mono text-red-400">0<span className="text-sm text-muted-foreground ml-1">个</span></p>
+              <p className="text-2xl font-bold font-mono text-red-400">{dueToday}<span className="text-sm text-muted-foreground ml-1">个</span></p>
             </div>
           </GlassCard>
         </div>

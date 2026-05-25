@@ -18,12 +18,15 @@ import {
   Play,
   Pencil,
   Check,
+  HelpCircle,
 } from 'lucide-react';
 import {
   priorityConfig,
   statusConfig,
 } from '@/data/mockData';
 import type { Task } from '@/data/mockData';
+import { useUserRole } from '@/context/UserRoleContext';
+import { useHelpRequestsApi } from '@/hooks/useHelpRequests';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -32,6 +35,7 @@ interface TaskDetailPanelProps {
 }
 
 const easeValues = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
+const helpReasons = ['任务卡住了', '需要资源支持', '进度有风险', '需要管理者决策', '其他问题'];
 
 function getMember(task: any) { 
   // task could be a string (assignee name) or an object with .assignee
@@ -76,6 +80,7 @@ function UserAvatar({ name, src, size = 28 }: { name?: string; src?: string; siz
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('zh-CN', {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
   });
@@ -199,6 +204,15 @@ export default function TaskDetailPanel({
               </h3>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              {isEmployee && (
+                <button
+                  onClick={() => setShowHelpPanel(!showHelpPanel)}
+                  className={`p-1.5 rounded-lg transition-colors ${showHelpPanel ? 'bg-orange-500/20 text-orange-400' : 'hover:bg-muted text-muted-foreground'}`}
+                  title="向管理者求助"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+              )}
               <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -210,6 +224,48 @@ export default function TaskDetailPanel({
               </button>
             </div>
           </div>
+
+          {/* Help Panel */}
+          <AnimatePresence>
+            {showHelpPanel && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden border-b border-border bg-orange-500/5"
+              >
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-xs font-medium text-orange-400 flex items-center gap-1.5">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    向管理者求助
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {helpReasons.map((reason) => (
+                      <button
+                        key={reason}
+                        onClick={() => {
+                          setHelpReason(reason);
+                          helpApi.addHelpRequest({
+                            taskId: task?.id || '',
+                            taskTitle: task?.title || '',
+                            reason,
+                            employeeName: task?.assignee_name || '',
+                          }).then(() => {
+                            toast.success('已发送求助给管理者');
+                            setShowHelpPanel(false);
+                            setHelpReason('');
+                          }).catch(() => toast.error('求助发送失败'));
+                        }}
+                        className="rounded-md bg-muted px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-orange-500/20 hover:text-orange-400"
+                      >
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-5 space-y-6">
